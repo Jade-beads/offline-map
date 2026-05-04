@@ -172,6 +172,15 @@ export const mapActions = {
     })
   },
 
+  patchLayerStyle(layerId, stylePatch = {}) {
+    if (!layerId) return
+
+    this.dispatchMapCommand('layer:style:patch', {
+      layerId,
+      stylePatch
+    })
+  },
+
   setLayerCategoryVisible(layerId, category, visible) {
     this.dispatchMapCommand('layer:category-visible', {
       layerId,

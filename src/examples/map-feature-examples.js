@@ -157,6 +157,19 @@ export function updateRegionBoundaryStyleExample() {
   })
 }
 
+export function patchRegionBoundaryStyleExample() {
+  if (!mapActions.getLayerInfo(EXAMPLE_REGION_LAYER_ID)) {
+    renderRegionBoundaryExample()
+  }
+
+  mapActions.patchLayerStyle(EXAMPLE_REGION_LAYER_ID, {
+    polygon: {
+      fillOpacity: 0.36,
+      strokeWeight: 5
+    }
+  })
+}
+
 export function renderMixedOverlayExample() {
   mapActions.renderGeoJSONLayer({
     layerId: EXAMPLE_MIXED_LAYER_ID,
@@ -189,6 +202,25 @@ export function renderMixedOverlayExample() {
   mapActions.fitLayerView(EXAMPLE_MIXED_LAYER_ID, {
     padding: [90, 80],
     maxZoom: 14
+  })
+}
+
+export function patchMixedLayerStyleExample() {
+  if (!mapActions.getLayerInfo(EXAMPLE_MIXED_LAYER_ID)) {
+    renderMixedOverlayExample()
+  }
+
+  mapActions.patchLayerStyle(EXAMPLE_MIXED_LAYER_ID, {
+    point: {
+      color: '#f59e0b'
+    },
+    line: {
+      strokeWeight: 6
+    },
+    polygon: {
+      fillOpacity: 0.28,
+      strokeColor: '#f59e0b'
+    }
   })
 }
 
@@ -298,6 +330,22 @@ export function renderClusterLayerExample() {
   mapActions.fitLayerView(EXAMPLE_CLUSTER_LAYER_ID, {
     padding: [80, 80],
     maxZoom: 14
+  })
+}
+
+export function patchClusterLayerStyleExample() {
+  if (!mapActions.getLayerInfo(EXAMPLE_CLUSTER_LAYER_ID)) {
+    renderClusterLayerExample()
+  }
+
+  mapActions.patchLayerStyle(EXAMPLE_CLUSTER_LAYER_ID, {
+    point: {
+      color: '#f59e0b'
+    },
+    cluster: {
+      color: '#f97316',
+      textColor: '#ffffff'
+    }
   })
 }
 

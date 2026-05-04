@@ -139,6 +139,15 @@ export const locaActions = {
     })
   },
 
+  patchLayerStyle(layerId, stylePatch = {}) {
+    if (!layerId) return
+
+    this.dispatchLocaCommand('loca:layer:style:patch', {
+      layerId,
+      stylePatch
+    })
+  },
+
   setFeatureStyle(layerId, featureId, style = {}) {
     if (!layerId || featureId == null) return
 

@@ -1188,6 +1188,27 @@ function makeGeoJSONLayer(layerId, context) {
       renderVectorOverlays()
     },
 
+    patchStyle(stylePatch = {}) {
+      layerStyle = mergeStyle(layerStyle, stylePatch || {})
+
+      if (isHeatmapStyle(layerStyle)) {
+        clear()
+        heatmapStyle = resolveHeatmapStyle(layerStyle)
+        heatmap = createOfficialHeatmap(AMap, map, heatmapStyle, visible)
+
+        if (heatmap) {
+          refreshHeatmap()
+        } else {
+          console.warn('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
+        }
+
+        return
+      }
+
+      clearHeatmap()
+      renderVectorOverlays()
+    },
+
     setCategoryVisible(category, nextVisible) {
       updateHiddenCategories(hiddenCategories, category, nextVisible)
 
@@ -1273,6 +1294,7 @@ function makeGeoJSONLayer(layerId, context) {
         clickedFeatureId: clickedFeatureKey || null,
         geometryKinds: getLayerGeometryKinds(),
         hasHeatmap: Boolean(heatmap),
+        styleSnapshot: mergeStyle({}, layerStyle),
         featureIndex: createFeatureIndex(features)
       }
     },

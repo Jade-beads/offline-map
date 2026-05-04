@@ -145,6 +145,7 @@ export class MapController {
       'layer:render': () => this.renderLayer(command.payload),
       'layer:visible': () => this.setLayerVisible(command.payload),
       'layer:style': () => this.setLayerStyle(command.payload),
+      'layer:style:patch': () => this.patchLayerStyle(command.payload),
       'layer:category-visible': () => this.setLayerCategoryVisible(command.payload),
       'layer:features-visible': () => this.setFeaturesVisible(command.payload),
       'layer:clear': () => this.clearLayer(command.payload),
@@ -232,6 +233,16 @@ export class MapController {
     if (!layer || !layer.setStyle) return
 
     layer.setStyle(payload.style)
+    this.syncLayerInfo(payload.layerId, layer)
+  }
+
+  patchLayerStyle(payload = {}) {
+    if (!payload.layerId) return
+
+    const layer = this.layers.get(payload.layerId)
+    if (!layer || !layer.patchStyle) return
+
+    layer.patchStyle(payload.stylePatch)
     this.syncLayerInfo(payload.layerId, layer)
   }
 

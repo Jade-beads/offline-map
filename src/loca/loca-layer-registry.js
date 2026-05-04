@@ -1,3 +1,5 @@
+import { mergeStyle } from '../map/style-resolver'
+
 const GEOMETRY_TYPES = [
   'Point',
   'MultiPoint',
@@ -61,6 +63,12 @@ const DEFAULT_STYLES = {
     lineWidth: 3,
     opacity: 0.9
   }
+}
+
+const RUNTIME_LAYER_OPTION_SETTERS = {
+  opacity: 'setOpacity',
+  zIndex: 'setzIndex',
+  zooms: 'setZooms'
 }
 
 function isPlainObject(value) {
@@ -237,10 +245,14 @@ function mergeVisualStyle(type, constructorName, visualStyle) {
   const defaultStyleKey = getDefaultStyleKey(type, constructorName)
   const nextVisualStyle = normalizeVisualStyleAliases(defaultStyleKey, visualStyle)
 
-  return {
-    ...(DEFAULT_STYLES[defaultStyleKey] || {}),
-    ...(nextVisualStyle || {})
-  }
+  return mergeStyle(DEFAULT_STYLES[defaultStyleKey] || {}, nextVisualStyle || {})
+}
+
+function patchVisualStyle(type, constructorName, currentStyle, stylePatch) {
+  const defaultStyleKey = getDefaultStyleKey(type, constructorName)
+  const nextVisualStyle = normalizeVisualStyleAliases(defaultStyleKey, stylePatch)
+
+  return mergeStyle(currentStyle || {}, nextVisualStyle || {})
 }
 
 function normalizeVisualStyleAliases(defaultStyleKey, visualStyle) {
@@ -435,6 +447,34 @@ function hasLayerOptionsChanged(left = {}, right = {}) {
   if (leftKeys.length !== rightKeys.length) return true
 
   return leftKeys.some((key) => !Object.prototype.hasOwnProperty.call(right, key) || !Object.is(left[key], right[key]))
+}
+
+function getChangedLayerOptionKeys(left = {}, right = {}) {
+  return Object.keys(left).filter((key) => !Object.is(left[key], right[key]))
+}
+
+function canPatchLayerOptions(keys = []) {
+  return keys.every((key) => key === 'visible' || RUNTIME_LAYER_OPTION_SETTERS[key])
+}
+
+function applyRuntimeLayerOptions(targetLayer, options = {}, keys = []) {
+  if (!targetLayer) return
+
+  keys.forEach((key) => {
+    if (key === 'visible') {
+      if (options.visible === false && typeof targetLayer.hide === 'function') {
+        targetLayer.hide()
+      } else if (options.visible !== false && typeof targetLayer.show === 'function') {
+        targetLayer.show()
+      }
+      return
+    }
+
+    const setter = RUNTIME_LAYER_OPTION_SETTERS[key]
+    if (setter && typeof targetLayer[setter] === 'function') {
+      targetLayer[setter](options[key])
+    }
+  })
 }
 
 function createFeatureIndex(features) {
@@ -691,7 +731,9 @@ export function createLocaLayer(layerId, context) {
     setStyle(style = {}) {
       const styleParts = splitStyle(style, layerOptions)
       const nextLayerOptions = styleParts.layerOptions
-      const shouldRecreateLayer = hasLayerOptionsChanged(nextLayerOptions, layerOptions)
+      const changedLayerOptionKeys = getChangedLayerOptionKeys(nextLayerOptions, layerOptions)
+      const shouldRecreateLayer = hasLayerOptionsChanged(nextLayerOptions, layerOptions) &&
+        !canPatchLayerOptions(changedLayerOptionKeys)
       layerOptions = nextLayerOptions
       visualStyle = mergeVisualStyle(currentType, constructorName, styleParts.visualStyle)
       featureStyleOverrides.clear()
@@ -700,6 +742,31 @@ export function createLocaLayer(layerId, context) {
         renderLocaLayer()
         return
       }
+
+      applyRuntimeLayerOptions(layer, layerOptions, changedLayerOptionKeys)
+
+      if (layer && typeof layer.setStyle === 'function') {
+        layer.setStyle(getResolvedVisualStyle())
+        refreshHighlightLayer()
+        requestRender(container)
+      }
+    },
+
+    patchStyle(stylePatch = {}) {
+      const styleParts = splitStyle(stylePatch, {})
+      const nextLayerOptions = mergeStyle(layerOptions, styleParts.layerOptions)
+      const changedLayerOptionKeys = getChangedLayerOptionKeys(nextLayerOptions, layerOptions)
+      const shouldRecreateLayer = hasLayerOptionsChanged(nextLayerOptions, layerOptions) &&
+        !canPatchLayerOptions(changedLayerOptionKeys)
+      layerOptions = nextLayerOptions
+      visualStyle = patchVisualStyle(currentType, constructorName, visualStyle, styleParts.visualStyle)
+
+      if (shouldRecreateLayer) {
+        renderLocaLayer()
+        return
+      }
+
+      applyRuntimeLayerOptions(layer, layerOptions, changedLayerOptionKeys)
 
       if (layer && typeof layer.setStyle === 'function') {
         layer.setStyle(getResolvedVisualStyle())
@@ -826,7 +893,8 @@ export function createLocaLayer(layerId, context) {
         styledFeatureIds: Array.from(featureStyleOverrides.keys()),
         geometryKinds: getLayerGeometryKinds(features),
         style: visualStyle,
-        layerOptions,
+        styleSnapshot: mergeStyle({}, visualStyle),
+        layerOptions: mergeStyle({}, layerOptions),
         featureIndex: createFeatureIndex(features)
       }
     }

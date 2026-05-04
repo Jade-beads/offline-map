@@ -4,6 +4,7 @@ import {
   getFeatureName,
   getFeatureProperties,
   getPropertyValue,
+  mergeStyle,
   resolveFeatureStyle
 } from './style-resolver'
 
@@ -28,29 +29,6 @@ const DEFAULT_CLUSTER_STYLE = {
     size: [44, 44],
     zIndex: 130
   }
-}
-
-function isPlainObject(value) {
-  return Object.prototype.toString.call(value) === '[object Object]'
-}
-
-function mergeStyle(...items) {
-  return items.reduce((result, item) => {
-    if (!isPlainObject(item)) return result
-
-    Object.keys(item).forEach((key) => {
-      const value = item[key]
-      if (value === undefined) return
-
-      if (isPlainObject(value) && isPlainObject(result[key])) {
-        result[key] = mergeStyle(result[key], value)
-      } else {
-        result[key] = value
-      }
-    })
-
-    return result
-  }, {})
 }
 
 function toNumber(value, fallback) {
@@ -570,6 +548,11 @@ function makeClusterLayer(layerId, context) {
       createCluster()
     },
 
+    patchStyle(stylePatch = {}) {
+      layerStyle = mergeStyle(layerStyle, stylePatch || {})
+      createCluster()
+    },
+
     setCategoryVisible(category, nextVisible) {
       updateHiddenCategories(hiddenCategories, category, nextVisible)
       refreshData()
@@ -621,6 +604,7 @@ function makeClusterLayer(layerId, context) {
         hiddenFeatureIds: Array.from(hiddenFeatureIds),
         geometryKinds: ['point'],
         hasHeatmap: false,
+        styleSnapshot: mergeStyle({}, layerStyle),
         featureIndex: createFeatureIndex(features)
       }
     }
@@ -630,4 +614,3 @@ function makeClusterLayer(layerId, context) {
 export function createClusterLayer(layerId, context) {
   return makeClusterLayer(layerId, context)
 }
-

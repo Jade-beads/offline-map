@@ -24,6 +24,7 @@ export class LocaController {
       'loca:layer:category-visible': () => this.setLayerCategoryVisible(command.payload),
       'loca:layer:features-visible': () => this.setFeaturesVisible(command.payload),
       'loca:layer:style': () => this.setLayerStyle(command.payload),
+      'loca:layer:style:patch': () => this.patchLayerStyle(command.payload),
       'loca:layer:feature-style': () => this.setFeatureStyle(command.payload),
       'loca:layer:feature-style:clear': () => this.clearFeatureStyle(command.payload),
       'loca:layer:feature-styles:clear': () => this.clearLayerFeatureStyles(command.payload),
@@ -103,6 +104,16 @@ export class LocaController {
     if (!layer || !layer.setStyle) return
 
     layer.setStyle(payload.style)
+    this.syncLayerInfo(payload.layerId, layer)
+  }
+
+  patchLayerStyle(payload = {}) {
+    if (!payload.layerId) return
+
+    const layer = this.layers.get(payload.layerId)
+    if (!layer || !layer.patchStyle) return
+
+    layer.patchStyle(payload.stylePatch)
     this.syncLayerInfo(payload.layerId, layer)
   }
 

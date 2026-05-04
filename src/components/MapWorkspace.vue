@@ -50,6 +50,9 @@
     <section class="example-panel">
       <div class="example-title">功能示例</div>
       <div class="example-actions">
+        <el-button size="mini" @click="handlePatchMixedLayerStyle">Patch普通样式</el-button>
+        <el-button size="mini" @click="handlePatchClusterLayerStyle">Patch聚合样式</el-button>
+        <el-button size="mini" @click="handlePatchLocaStyle">PatchLoca样式</el-button>
         <el-button size="mini" @click="handleRenderMixedOverlays">渲染点线面</el-button>
         <el-button size="mini" @click="handleHideMixedPoint">隐藏点</el-button>
         <el-button size="mini" @click="handleShowMixedPoint">显示点</el-button>
@@ -96,6 +99,8 @@ import {
   getLayerInfoExample,
   getMixedFeatureInfoExample,
   highlightMixedFeatureExample,
+  patchClusterLayerStyleExample,
+  patchMixedLayerStyleExample,
   renderClusterLayerExample,
   renderMixedOverlayExample,
   renderPrefixLayerExample,
@@ -111,6 +116,7 @@ import {
   getLocaLayerInfoExample,
   highlightLocaFeatureExample,
   LOCA_EXAMPLE_HIGHLIGHT_FEATURE_ID,
+  patchLocaMassPointStyleExample,
   renderLocaGridExample,
   renderLocaHeatmapExample,
   renderLocaMassPointExample,
@@ -139,6 +145,9 @@ export default {
     },
     handleUpdateRegionStyle() {
       updateRegionBoundaryStyleExample()
+    },
+    handlePatchMixedLayerStyle() {
+      patchMixedLayerStyleExample()
     },
     handleClearRegionBoundary() {
       clearRegionBoundaryExample()
@@ -173,6 +182,9 @@ export default {
     handleRenderClusterLayer() {
       renderClusterLayerExample()
     },
+    handlePatchClusterLayerStyle() {
+      patchClusterLayerStyleExample()
+    },
     handleClearClusterLayer() {
       clearClusterLayerExample()
     },
@@ -194,6 +206,9 @@ export default {
     },
     handleUpdateLocaStyle() {
       updateLocaMassPointStyleExample()
+    },
+    handlePatchLocaStyle() {
+      patchLocaMassPointStyleExample()
     },
     handleHighlightLocaPoint() {
       highlightLocaFeatureExample(LOCA_EXAMPLE_HIGHLIGHT_FEATURE_ID)

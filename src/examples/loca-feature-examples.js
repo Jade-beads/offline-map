@@ -155,6 +155,32 @@ export function updateLocaMassPointStyleExample() {
   })
 }
 
+export function patchLocaMassPointStyleExample() {
+  if (!locaActions.getLayerInfo(LOCA_EXAMPLE_POINT_LAYER_ID)) {
+    renderLocaMassPointExample()
+  }
+
+  locaActions.patchLayerStyle(LOCA_EXAMPLE_POINT_LAYER_ID, {
+    radius: 8.5,
+    blurWidth: 0.35,
+    layerOptions: {
+      opacity: 0.72
+    }
+  })
+}
+
+export function patchLocaHeatmapOpacityExample(opacity = 0.58) {
+  if (!locaActions.getLayerInfo(LOCA_EXAMPLE_HEAT_LAYER_ID)) {
+    renderLocaHeatmapExample()
+  }
+
+  locaActions.patchLayerStyle(LOCA_EXAMPLE_HEAT_LAYER_ID, {
+    layerOptions: {
+      opacity
+    }
+  })
+}
+
 export function setLocaFeatureVisibleExample(featureId, visible) {
   if (!locaActions.getLayerInfo(LOCA_EXAMPLE_POINT_LAYER_ID)) {
     renderLocaMassPointExample()
