@@ -3,6 +3,7 @@
     <div ref="container" class="map-container"></div>
     <div v-if="errorMessage" class="map-message error">{{ errorMessage }}</div>
     <div v-else-if="loading" class="map-message">地图正在加载中...</div>
+    <div v-if="coordinateCopyTip" class="map-copy-tip">{{ coordinateCopyTip }}</div>
   </section>
 </template>
 
@@ -134,6 +135,9 @@ export default {
       cleanupMapCompleteObserver: null,
       moveEndHandler: null,
       zoomEndHandler: null,
+      rightClickHandler: null,
+      coordinateCopyTip: '',
+      coordinateCopyTipTimer: null,
       loading: true,
       errorMessage: '',
       lastHandledCommandSeq: 0,
@@ -197,6 +201,7 @@ export default {
     }
 
     this.clearMapEvents()
+    this.clearCoordinateCopyTip()
 
     if (this.locaController) {
       this.locaController.destroy()
@@ -229,8 +234,21 @@ export default {
         })
       }
 
+      this.rightClickHandler = (event) => {
+        const lnglat = toLngLatArray(event && event.lnglat)
+        if (!lnglat) return
+
+        const coordinate = lnglat.join(',')
+        this.copyTextToClipboard(coordinate).then((copied) => {
+          if (copied) {
+            this.showCoordinateCopyTip(`坐标已复制：${coordinate}`)
+          }
+        })
+      }
+
       map.on('moveend', this.moveEndHandler)
       map.on('zoomend', this.zoomEndHandler)
+      map.on('rightclick', this.rightClickHandler)
     },
     clearMapEvents() {
       if (!this.map || typeof this.map.off !== 'function') return
@@ -244,6 +262,51 @@ export default {
         this.map.off('zoomend', this.zoomEndHandler)
         this.zoomEndHandler = null
       }
+
+      if (this.rightClickHandler) {
+        this.map.off('rightclick', this.rightClickHandler)
+        this.rightClickHandler = null
+      }
+    },
+    copyTextToClipboard(text) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        return navigator.clipboard.writeText(text).then(() => true).catch((error) => {
+          console.warn('[AmapMap] Failed to copy map coordinate.', error)
+          return false
+        })
+      }
+
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.setAttribute('readonly', '')
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+
+      try {
+        return Promise.resolve(document.execCommand('copy'))
+      } catch (error) {
+        console.warn('[AmapMap] Failed to copy map coordinate.', error)
+        return Promise.resolve(false)
+      } finally {
+        document.body.removeChild(textarea)
+      }
+    },
+    showCoordinateCopyTip(message) {
+      this.clearCoordinateCopyTip()
+      this.coordinateCopyTip = message
+      this.coordinateCopyTipTimer = window.setTimeout(() => {
+        this.coordinateCopyTip = ''
+        this.coordinateCopyTipTimer = null
+      }, 1600)
+    },
+    clearCoordinateCopyTip() {
+      if (this.coordinateCopyTipTimer) {
+        window.clearTimeout(this.coordinateCopyTipTimer)
+        this.coordinateCopyTipTimer = null
+      }
+      this.coordinateCopyTip = ''
     },
     setupLocaController(AMap, map) {
       const Loca = window.Loca
@@ -341,6 +404,25 @@ export default {
 .map-message.error {
   color: #d93026;
 }
+
+.map-copy-tip {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  max-width: min(360px, calc(100% - 32px));
+  padding: 10px 14px;
+  overflow: hidden;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(17, 24, 39, 0.88);
+  box-shadow: 0 8px 24px rgba(20, 45, 86, 0.22);
+  pointer-events: none;
+}
 </style>
 
 <style>
@@ -400,6 +482,35 @@ export default {
   font-weight: 700;
   box-shadow: 0 4px 14px rgba(24, 47, 77, 0.28);
   cursor: pointer;
+}
+
+.geojson-cluster-custom-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.geojson-cluster-custom-marker img,
+.geojson-cluster-custom-marker svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.geojson-cluster-custom-marker span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  pointer-events: none;
 }
 
 .custom-map-marker {

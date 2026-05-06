@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70" viewBox="0 0 70 70" role="img" aria-label="光大银行聚合点位">
+  <defs>
+    <filter id="shadow" x="-30%" y="-20%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#17202B" flood-opacity=".18"/>
+    </filter>
+  </defs>
+  <circle cx="35" cy="35" r="35" fill="#9662C8" opacity=".12"/>
+  <circle cx="35" cy="35" r="29" fill="#9662C8" opacity=".22"/>
+  <circle filter="url(#shadow)" cx="35" cy="35" r="24" fill="#6B2FA0" stroke="#FFFFFF" stroke-width="3"/>
+  <text x="35" y="41" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF">18</text>
+</svg>

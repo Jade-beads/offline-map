@@ -1,0 +1,211 @@
+{
+  "usage": {
+    "amapImageSize": [
+      56,
+      64
+    ],
+    "selectedImageSize": [
+      76,
+      84
+    ],
+    "clusterSizes": [
+      [
+        70,
+        70
+      ],
+      [
+        80,
+        80
+      ],
+      [
+        92,
+        92
+      ]
+    ],
+    "note": "SVGs are map marker wrappers using brand colors and short bank labels. Replace the central label with authorized official logo artwork when final brand approval is required."
+  },
+  "banks": [
+    {
+      "id": "boc",
+      "name": "中国银行",
+      "code": "BOC",
+      "color": "#B6002A",
+      "accent": "#d21f3e",
+      "marker": "/bank-icons/boc.svg",
+      "selectedMarker": "/bank-icons/boc-selected.svg",
+      "officialMarker": "/bank-icons/boc-official.svg",
+      "selectedOfficialMarker": "/bank-icons/boc-official-selected.svg",
+      "cluster": "/bank-icons/boc-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:Bank_of_China_symbol.svg"
+    },
+    {
+      "id": "icbc",
+      "name": "工商银行",
+      "code": "ICBC",
+      "color": "#C7000B",
+      "accent": "#E33A3A",
+      "marker": "/bank-icons/icbc.svg",
+      "selectedMarker": "/bank-icons/icbc-selected.svg",
+      "officialMarker": "/bank-icons/icbc-official.svg",
+      "selectedOfficialMarker": "/bank-icons/icbc-official-selected.svg",
+      "cluster": "/bank-icons/icbc-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:ICBC_China_logo.svg"
+    },
+    {
+      "id": "ccb",
+      "name": "建设银行",
+      "code": "CCB",
+      "color": "#005BAC",
+      "accent": "#2078D4",
+      "marker": "/bank-icons/ccb.svg",
+      "selectedMarker": "/bank-icons/ccb-selected.svg",
+      "officialMarker": "/bank-icons/ccb-official.svg",
+      "selectedOfficialMarker": "/bank-icons/ccb-official-selected.svg",
+      "cluster": "/bank-icons/ccb-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:People_Construction_Bank_of_China_logo.svg"
+    },
+    {
+      "id": "abc",
+      "name": "农业银行",
+      "code": "ABC",
+      "color": "#008566",
+      "accent": "#13A886",
+      "marker": "/bank-icons/abc.svg",
+      "selectedMarker": "/bank-icons/abc-selected.svg",
+      "officialMarker": "/bank-icons/abc-official.svg",
+      "selectedOfficialMarker": "/bank-icons/abc-official-selected.svg",
+      "cluster": "/bank-icons/abc-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://en.wikipedia.org/wiki/Agricultural_Bank_of_China"
+    },
+    {
+      "id": "cdb",
+      "name": "国家开发银行",
+      "code": "CDB",
+      "color": "#004B8D",
+      "accent": "#2D74B8",
+      "marker": "/bank-icons/cdb.svg",
+      "selectedMarker": "/bank-icons/cdb-selected.svg",
+      "officialMarker": "/bank-icons/cdb-official.svg",
+      "selectedOfficialMarker": "/bank-icons/cdb-official-selected.svg",
+      "cluster": "/bank-icons/cdb-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:PRC_China_Development_Bank_(CDB)_logo.svg"
+    },
+    {
+      "id": "adbc",
+      "name": "中国农业发展银行",
+      "code": "ADBC",
+      "color": "#006B3F",
+      "accent": "#2CA66A",
+      "marker": "/bank-icons/adbc.svg",
+      "selectedMarker": "/bank-icons/adbc-selected.svg",
+      "officialMarker": null,
+      "selectedOfficialMarker": null,
+      "cluster": "/bank-icons/adbc-cluster-2.svg",
+      "officialLogoSourceCandidate": null
+    },
+    {
+      "id": "bocom",
+      "name": "交通银行",
+      "code": "BOCOM",
+      "color": "#003B7A",
+      "accent": "#1F6BC1",
+      "marker": "/bank-icons/bocom.svg",
+      "selectedMarker": "/bank-icons/bocom-selected.svg",
+      "officialMarker": "/bank-icons/bocom-official.svg",
+      "selectedOfficialMarker": "/bank-icons/bocom-official-selected.svg",
+      "cluster": "/bank-icons/bocom-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:Bank_of_Communications_Logo.svg"
+    },
+    {
+      "id": "cmb",
+      "name": "招商银行",
+      "code": "CMB",
+      "color": "#E60012",
+      "accent": "#F05A5A",
+      "marker": "/bank-icons/cmb.svg",
+      "selectedMarker": "/bank-icons/cmb-selected.svg",
+      "officialMarker": "/bank-icons/cmb-official.svg",
+      "selectedOfficialMarker": "/bank-icons/cmb-official-selected.svg",
+      "cluster": "/bank-icons/cmb-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:China_Merchants_Bank_logo.jpg"
+    },
+    {
+      "id": "psbc",
+      "name": "邮储银行",
+      "code": "PSBC",
+      "color": "#007A3D",
+      "accent": "#20A464",
+      "marker": "/bank-icons/psbc.svg",
+      "selectedMarker": "/bank-icons/psbc-selected.svg",
+      "officialMarker": "/bank-icons/psbc-official.svg",
+      "selectedOfficialMarker": "/bank-icons/psbc-official-selected.svg",
+      "cluster": "/bank-icons/psbc-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:Postal_Savings_Bank_of_China_-_text_logo.svg"
+    },
+    {
+      "id": "cmbc",
+      "name": "民生银行",
+      "code": "CMBC",
+      "color": "#008C8C",
+      "accent": "#22B8B8",
+      "marker": "/bank-icons/cmbc.svg",
+      "selectedMarker": "/bank-icons/cmbc-selected.svg",
+      "officialMarker": null,
+      "selectedOfficialMarker": null,
+      "cluster": "/bank-icons/cmbc-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://commons.wikimedia.org/wiki/File:China_Minsheng_Bank_logo.svg"
+    },
+    {
+      "id": "cib",
+      "name": "兴业银行",
+      "code": "CIB",
+      "color": "#004A98",
+      "accent": "#1D6FD1",
+      "marker": "/bank-icons/cib.svg",
+      "selectedMarker": "/bank-icons/cib-selected.svg",
+      "officialMarker": null,
+      "selectedOfficialMarker": null,
+      "cluster": "/bank-icons/cib-cluster-2.svg",
+      "officialLogoSourceCandidate": null
+    },
+    {
+      "id": "spdb",
+      "name": "浦发银行",
+      "code": "SPDB",
+      "color": "#123C7C",
+      "accent": "#3B67B0",
+      "marker": "/bank-icons/spdb.svg",
+      "selectedMarker": "/bank-icons/spdb-selected.svg",
+      "officialMarker": null,
+      "selectedOfficialMarker": null,
+      "cluster": "/bank-icons/spdb-cluster-2.svg",
+      "officialLogoSourceCandidate": null
+    },
+    {
+      "id": "citic",
+      "name": "中信银行",
+      "code": "CITIC",
+      "color": "#C8102E",
+      "accent": "#E7445E",
+      "marker": "/bank-icons/citic.svg",
+      "selectedMarker": "/bank-icons/citic-selected.svg",
+      "officialMarker": "/bank-icons/citic-official.svg",
+      "selectedOfficialMarker": "/bank-icons/citic-official-selected.svg",
+      "cluster": "/bank-icons/citic-cluster-2.svg",
+      "officialLogoSourceCandidate": null
+    },
+    {
+      "id": "ceb",
+      "name": "光大银行",
+      "code": "CEB",
+      "color": "#6B2FA0",
+      "accent": "#9662C8",
+      "marker": "/bank-icons/ceb.svg",
+      "selectedMarker": "/bank-icons/ceb-selected.svg",
+      "officialMarker": null,
+      "selectedOfficialMarker": null,
+      "cluster": "/bank-icons/ceb-cluster-2.svg",
+      "officialLogoSourceCandidate": "https://en.wikipedia.org/wiki/China_Everbright_Bank"
+    }
+  ]
+}

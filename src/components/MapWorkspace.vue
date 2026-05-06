@@ -47,6 +47,20 @@
       <button type="button" @click="actions.clearRuler()">删除</button>
     </section>
 
+    <HeatmapToolbar
+      v-if="heatmapToolbarVisible"
+      :layer-id="heatmapToolbarLayerId"
+      mode="loca"
+      title="热力图"
+      :visible="heatmapLayerVisible"
+      :opacity="heatmapLayerOpacity"
+      :stops="heatmapLegendStops"
+      low-label="低"
+      high-label="高"
+      @visible-change="heatmapLayerVisible = $event"
+      @opacity-change="heatmapLayerOpacity = $event"
+    />
+
     <section class="example-panel">
       <div class="example-title">功能示例</div>
       <div class="example-actions">
@@ -88,6 +102,7 @@
 
 <script>
 import AmapMap from './AmapMap.vue'
+import HeatmapToolbar from './HeatmapToolbar.vue'
 import { mapActions, mapStore } from '../map/map-store'
 import {
   EXAMPLE_FEATURE_IDS,
@@ -115,6 +130,7 @@ import {
   getLocaFeatureInfoExample,
   getLocaLayerInfoExample,
   highlightLocaFeatureExample,
+  LOCA_EXAMPLE_HEAT_LAYER_ID,
   LOCA_EXAMPLE_HIGHLIGHT_FEATURE_ID,
   patchLocaMassPointStyleExample,
   renderLocaGridExample,
@@ -127,13 +143,25 @@ import {
 export default {
   name: 'MapWorkspace',
   components: {
-    AmapMap
+    AmapMap,
+    HeatmapToolbar
   },
   data() {
     return {
       store: mapStore,
       actions: mapActions,
-      keyword: ''
+      keyword: '',
+      heatmapToolbarVisible: false,
+      heatmapToolbarLayerId: LOCA_EXAMPLE_HEAT_LAYER_ID,
+      heatmapLayerVisible: true,
+      heatmapLayerOpacity: 86,
+      heatmapLegendStops: [
+        { value: 0.2, color: '#6b5ea8', label: '913.5万' },
+        { value: 0.45, color: '#84cc16', label: '1,748.7万' },
+        { value: 0.7, color: '#facc15', label: '2,500.1万' },
+        { value: 0.85, color: '#f97316', label: '2,998.8万' },
+        { value: 1, color: '#ef4444', label: '10,834.8万' }
+      ]
     }
   },
   methods: {
@@ -218,6 +246,9 @@ export default {
     },
     handleRenderLocaHeatmap() {
       renderLocaHeatmapExample()
+      this.heatmapToolbarVisible = true
+      this.heatmapLayerVisible = true
+      this.heatmapLayerOpacity = 86
     },
     handleRenderLocaGrid() {
       renderLocaGridExample()
@@ -230,6 +261,7 @@ export default {
     },
     handleClearLocaExamples() {
       clearLocaExamples()
+      this.heatmapToolbarVisible = false
     },
     handleShowLocaLayerInfo() {
       const layers = getLocaLayerInfoExample()
@@ -239,6 +271,7 @@ export default {
     },
     handleClearAllLocaLayers() {
       clearAllLocaLayersExample()
+      this.heatmapToolbarVisible = false
     },
     showMessage(message) {
       this.$message({

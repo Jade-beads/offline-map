@@ -5,6 +5,7 @@ import { createLayer } from '../src/map/layer-registry'
 import { MapController } from '../src/map/map-controller'
 import { mapActions, mapStore } from '../src/map/map-store'
 import { resolveFeatureStyle } from '../src/map/style-resolver'
+import { createWMSLayer } from '../src/map/wms-layer-registry'
 import { createLocaLayer } from '../src/loca/loca-layer-registry'
 import { locaActions, locaStore } from '../src/loca/loca-store'
 
@@ -40,6 +41,18 @@ class FakeLngLat {
   constructor(lng, lat) {
     this.lng = lng
     this.lat = lat
+  }
+
+  toArray() {
+    return [this.lng, this.lat]
+  }
+
+  getLng() {
+    return this.lng
+  }
+
+  getLat() {
+    return this.lat
   }
 }
 
@@ -198,6 +211,52 @@ class FakeMarkerCluster {
 }
 FakeMarkerCluster.instances = []
 
+class FakeWMSLayer {
+  constructor(options = {}) {
+    this.options = options
+    this.visible = options.visible !== false
+    this.params = options.param || {}
+    FakeWMSLayer.instances.push(this)
+  }
+
+  setUrl(url) {
+    this.options.url = url
+  }
+
+  setParams(params) {
+    this.params = params
+    this.options.param = params
+  }
+
+  setOpacity(opacity) {
+    this.opacity = opacity
+    this.options.opacity = opacity
+  }
+
+  setzIndex(zIndex) {
+    this.zIndex = zIndex
+    this.options.zIndex = zIndex
+  }
+
+  setZooms(zooms) {
+    this.zooms = zooms
+    this.options.zooms = zooms
+  }
+
+  show() {
+    this.visible = true
+  }
+
+  hide() {
+    this.visible = false
+  }
+
+  destroy() {
+    this.destroyed = true
+  }
+}
+FakeWMSLayer.instances = []
+
 function createFakeAMap() {
   return {
     Pixel: FakePixel,
@@ -207,7 +266,10 @@ function createFakeAMap() {
     Circle: FakeVectorOverlay,
     Polyline: FakeVectorOverlay,
     Polygon: FakeVectorOverlay,
-    MarkerCluster: FakeMarkerCluster
+    MarkerCluster: FakeMarkerCluster,
+    TileLayer: {
+      WMS: FakeWMSLayer
+    }
   }
 }
 
@@ -217,6 +279,7 @@ function createFakeMap() {
     removed: [],
     boundsCalls: [],
     centerCalls: [],
+    handlers: {},
     add(overlay) {
       this.added.push(overlay)
     },
@@ -228,6 +291,14 @@ function createFakeMap() {
     },
     setZoomAndCenter(zoom, center, immediately) {
       this.centerCalls.push({ zoom, center, immediately })
+    },
+    on(type, handler) {
+      this.handlers[type] = handler
+    },
+    off(type, handler) {
+      if (!handler || this.handlers[type] === handler) {
+        delete this.handlers[type]
+      }
     }
   }
 }
@@ -472,6 +543,11 @@ describe('cluster layer helpers', () => {
     expect(map.boundsCalls).toHaveLength(1)
     expect(map.boundsCalls[0].padding).toEqual([20, 30, 20, 30])
 
+    FakeMarkerCluster.instances[0].data[0].lnglat = new FakeLngLat(121.541016, 31.239651)
+    layer.fitView({ padding: [24, 32] })
+    expect(map.boundsCalls).toHaveLength(2)
+    expect(map.boundsCalls[1].padding).toEqual([24, 32, 24, 32])
+
     layer.focus(9691)
     expect(map.centerCalls[0].center).toEqual([121.541016, 31.239651])
 
@@ -490,6 +566,47 @@ describe('cluster layer helpers', () => {
 
     layer.show()
     expect(FakeMarkerCluster.instances[FakeMarkerCluster.instances.length - 1].map).toBe(map)
+  })
+
+  test('supports custom svg/html cluster marker content', () => {
+    FakeMarkerCluster.instances = []
+    const AMap = createFakeAMap()
+    const map = createFakeMap()
+    const layer = createClusterLayer('bank-cluster-svg', { AMap, map })
+
+    layer.setData(createBankPointGeoJSON(bankRecords), {
+      cluster: {
+        renderer: 'html',
+        size: [52, 52],
+        html: ({ count }) => `
+          <svg width="52" height="52" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="23" fill="#1677ff" />
+            <text x="26" y="31">${count}</text>
+          </svg>
+        `
+      }
+    })
+
+    const clusterMarker = FakeMarkerCluster.instances[0].clusterMarker
+    expect(clusterMarker.content).toContain('geojson-cluster-custom-marker')
+    expect(clusterMarker.content).toContain('<svg')
+    expect(clusterMarker.content).toContain('<text x="26" y="31">2</text>')
+    expect(clusterMarker.offset.x).toBe(-26)
+    expect(clusterMarker.offset.y).toBe(-26)
+
+    layer.patchStyle({
+      cluster: {
+        renderer: 'image',
+        image: {
+          src: '/cluster.svg'
+        },
+        text: ({ count }) => `${count}+`
+      }
+    })
+
+    const imageClusterMarker = FakeMarkerCluster.instances[FakeMarkerCluster.instances.length - 1].clusterMarker
+    expect(imageClusterMarker.content).toContain('img src="/cluster.svg"')
+    expect(imageClusterMarker.content).toContain('<span>2+</span>')
   })
 })
 
@@ -510,6 +627,24 @@ describe('map action command entry', () => {
     expect(mapStore.commandQueue[0].payload.layerId).toBe('bank-cluster')
   })
 
+  test('dispatches WMS render command as a separate layer entry', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    mapActions.renderWMSLayer({
+      layerId: 'geo-server-grid',
+      url: 'http://localhost/geoserver/demo/wms',
+      visible: true,
+      param: {
+        LAYERS: 'demo:grid'
+      }
+    })
+
+    expect(mapStore.commandQueue).toHaveLength(1)
+    expect(mapStore.commandQueue[0].type).toBe('wms:render')
+    expect(mapStore.commandQueue[0].payload.layerId).toBe('geo-server-grid')
+    expect(mapStore.commandQueue[0].payload.param.LAYERS).toBe('demo:grid')
+  })
+
   test('dispatches patch style command for map and Loca layers', () => {
     mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
     locaActions.clearHandledCommands(Number.POSITIVE_INFINITY)
@@ -527,6 +662,21 @@ describe('map action command entry', () => {
     expect(mapStore.commandQueue[0].payload.stylePatch.point.color).toBe('#f59e0b')
     expect(locaStore.commandQueue[0].type).toBe('loca:layer:style:patch')
     expect(locaStore.commandQueue[0].payload.stylePatch.radius).toBe(18)
+  })
+
+  test('clears previous custom marker result when entering marker mode', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+    mapActions.setCustomMarkerResult({
+      id: 'old-marker',
+      position: [121, 31],
+      lng: 121,
+      lat: 31
+    })
+
+    mapActions.activateCustomMarker()
+
+    expect(mapStore.customMarkerResult).toBe(null)
+    expect(mapStore.commandQueue[0].type).toBe('marker:start')
   })
 
   test('controller routes patch style command and syncs layer info', () => {
@@ -573,6 +723,156 @@ describe('map action command entry', () => {
         featureCount: 1
       }
     })
+  })
+})
+
+describe('WMS layer registry', () => {
+  test('creates WMS layer, patches params and reuses common visibility lifecycle', () => {
+    FakeWMSLayer.instances = []
+    const map = createFakeMap()
+    const layer = createWMSLayer('geo-server-grid', {
+      AMap: createFakeAMap(),
+      map
+    })
+
+    layer.setData({
+      url: 'http://localhost/geoserver/demo/wms',
+      visible: true,
+      opacity: 0.8,
+      zIndex: 70,
+      param: {
+        LAYERS: 'demo:grid'
+      }
+    })
+
+    expect(FakeWMSLayer.instances).toHaveLength(1)
+    expect(map.added[0]).toBe(FakeWMSLayer.instances[0])
+    expect(layer.getInfo().type).toBe('wms')
+    expect(layer.getInfo().visible).toBe(true)
+    expect(layer.getInfo().param.LAYERS).toBe('demo:grid')
+    expect(layer.getInfo().param.FORMAT).toBe('image/png')
+
+    layer.hide()
+    expect(FakeWMSLayer.instances[0].visible).toBe(false)
+    expect(layer.getInfo().visible).toBe(false)
+
+    layer.show()
+    expect(FakeWMSLayer.instances[0].visible).toBe(true)
+
+    layer.patchStyle({
+      opacity: 0.45,
+      zIndex: 90,
+      param: {
+        STYLES: 'heat_style'
+      }
+    })
+
+    expect(FakeWMSLayer.instances[0].opacity).toBe(0.45)
+    expect(FakeWMSLayer.instances[0].zIndex).toBe(90)
+    expect(FakeWMSLayer.instances[0].params.LAYERS).toBe('demo:grid')
+    expect(FakeWMSLayer.instances[0].params.STYLES).toBe('heat_style')
+
+    layer.destroy()
+    expect(map.removed).toContain(FakeWMSLayer.instances[0])
+    expect(FakeWMSLayer.instances[0].destroyed).toBe(true)
+  })
+
+  test('controller renders WMS layer and syncs layer info', () => {
+    FakeWMSLayer.instances = []
+    const synced = []
+    const removed = []
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map: createFakeMap(),
+      actions: {
+        setLayerInfo(layerId, info) {
+          synced.push({ layerId, info })
+        },
+        removeLayerInfo(layerId) {
+          removed.push(layerId)
+        }
+      }
+    })
+
+    controller.handleCommand({
+      type: 'wms:render',
+      payload: {
+        layerId: 'geo-server-grid',
+        url: 'http://localhost/geoserver/demo/wms',
+        visible: true,
+        param: {
+          LAYERS: 'demo:grid'
+        }
+      }
+    })
+
+    expect(synced[0].layerId).toBe('geo-server-grid')
+    expect(synced[0].info.type).toBe('wms')
+    expect(synced[0].info.param.LAYERS).toBe('demo:grid')
+
+    controller.handleCommand({
+      type: 'layer:style:patch',
+      payload: {
+        layerId: 'geo-server-grid',
+        stylePatch: {
+          opacity: 0.5
+        }
+      }
+    })
+    expect(synced[synced.length - 1].info.opacity).toBe(0.5)
+
+    controller.handleCommand({
+      type: 'layer:clear',
+      payload: {
+        layerId: 'geo-server-grid'
+      }
+    })
+    expect(removed).toEqual(['geo-server-grid'])
+  })
+})
+
+describe('custom marker result', () => {
+  test('stores clicked custom marker coordinates for business components', () => {
+    const map = createFakeMap()
+    const results = []
+    const activeTools = []
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setCustomMarkerResult(result) {
+          results.push(result)
+        },
+        setActiveTool(tool) {
+          activeTools.push(tool)
+        },
+        setLayerInfo() {},
+        removeLayerInfo() {}
+      }
+    })
+
+    controller.startCustomMarker()
+    expect(typeof map.handlers.click).toBe('function')
+
+    map.handlers.click({
+      lnglat: {
+        toArray() {
+          return [121.541016, 31.239651]
+        }
+      }
+    })
+
+    expect(map.added).toHaveLength(1)
+    expect(results).toHaveLength(1)
+    expect(results[0].type).toBe('custom-marker')
+    expect(results[0].id.startsWith('custom-')).toBe(true)
+    expect(results[0].position).toEqual([121.541016, 31.239651])
+    expect(results[0].lng).toBe(121.541016)
+    expect(results[0].lat).toBe(31.239651)
+    expect(typeof results[0].createdAt).toBe('number')
+    expect(map.added[0].extData.position).toEqual([121.541016, 31.239651])
+    expect(map.handlers.click).toBeUndefined()
+    expect(activeTools).toEqual([''])
   })
 })
 

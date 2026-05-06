@@ -45,6 +45,14 @@ export const mapMethodDemos = {
   clearHandledCommands: () => mapActions.clearHandledCommands(0),
   setDrawResult: () => mapActions.setDrawResult(null),
   clearDrawResult: () => mapActions.clearDrawResult(),
+  setCustomMarkerResult: () => mapActions.setCustomMarkerResult({
+    id: 'demo-custom-marker',
+    type: 'custom-marker',
+    position: [117.2272, 31.8206],
+    lng: 117.2272,
+    lat: 31.8206
+  }),
+  clearCustomMarkerResult: () => mapActions.clearCustomMarkerResult(),
   setLayerInfo: () => mapActions.setLayerInfo('demo-info', { visible: true, featureCount: 0 }),
   removeLayerInfo: () => mapActions.removeLayerInfo('demo-info'),
   clearLayerInfo: () => mapActions.clearLayerInfo(),

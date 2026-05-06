@@ -45,6 +45,7 @@ export const mapStore = Vue.observable({
   commandQueue: [],
   layerRegistry: {},
   drawResult: null,
+  customMarkerResult: null,
   viewport: {
     center: [117.2272, 31.8206],
     zoom: 11,
@@ -78,6 +79,14 @@ export const mapActions = {
 
   clearDrawResult() {
     mapStore.drawResult = null
+  },
+
+  setCustomMarkerResult(result) {
+    mapStore.customMarkerResult = result
+  },
+
+  clearCustomMarkerResult() {
+    mapStore.customMarkerResult = null
   },
 
   setLayerInfo(layerId, info = {}) {
@@ -139,6 +148,7 @@ export const mapActions = {
 
   activateCustomMarker() {
     mapStore.activeTool = 'custom-marker'
+    this.clearCustomMarkerResult()
     this.dispatchMapCommand('marker:start')
   },
 
@@ -316,6 +326,22 @@ export const mapActions = {
     if (renderParams.selection) {
       this.dispatchMapCommand('layer:focus', renderParams.selection)
     }
+  },
+
+  renderWMSLayer(params) {
+    const renderParams = typeof params === 'string'
+      ? { layerId: params }
+      : params || {}
+    const layerId = renderParams.layerId
+
+    if (!layerId) {
+      return
+    }
+
+    this.dispatchMapCommand('wms:render', {
+      ...renderParams,
+      layerId
+    })
   },
 
   setViewport(viewportPatch) {

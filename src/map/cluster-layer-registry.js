@@ -58,6 +58,18 @@ function createPixel(AMap, value) {
 }
 
 function normalizePosition(coordinates) {
+  if (coordinates && typeof coordinates.toArray === 'function') {
+    return normalizePosition(coordinates.toArray())
+  }
+
+  if (coordinates && typeof coordinates.getLng === 'function' && typeof coordinates.getLat === 'function') {
+    return normalizePosition([coordinates.getLng(), coordinates.getLat()])
+  }
+
+  if (coordinates && coordinates.lng != null && coordinates.lat != null) {
+    return normalizePosition([coordinates.lng, coordinates.lat])
+  }
+
   if (!Array.isArray(coordinates) || coordinates.length < 2) return null
 
   const lng = Number(coordinates[0])
@@ -196,6 +208,7 @@ function resolveAssetUrl(src) {
   if (!src) return ''
   const value = String(src)
   if (/^(data:|https?:|\/\/)/.test(value)) return value
+  if (typeof window === 'undefined' || !window.location) return value
 
   return new URL(value, window.location.origin).toString()
 }
@@ -207,18 +220,19 @@ function createLngLat(AMap, position) {
 }
 
 function createBounds(AMap, positions) {
-  if (!positions.length || typeof AMap.Bounds !== 'function') return null
+  const normalizedPositions = positions.map(normalizePosition).filter(Boolean)
+  if (!normalizedPositions.length || typeof AMap.Bounds !== 'function') return null
 
-  const range = positions.reduce((result, position) => ({
+  const range = normalizedPositions.reduce((result, position) => ({
     minLng: Math.min(result.minLng, position[0]),
     minLat: Math.min(result.minLat, position[1]),
     maxLng: Math.max(result.maxLng, position[0]),
     maxLat: Math.max(result.maxLat, position[1])
   }), {
-    minLng: positions[0][0],
-    minLat: positions[0][1],
-    maxLng: positions[0][0],
-    maxLat: positions[0][1]
+    minLng: normalizedPositions[0][0],
+    minLat: normalizedPositions[0][1],
+    maxLng: normalizedPositions[0][0],
+    maxLat: normalizedPositions[0][1]
   })
 
   const padding = 0.0005
@@ -288,6 +302,21 @@ function createHtmlContent(content, size) {
       ${content}
     </div>
   `
+}
+
+function createClusterHtmlContent(content, size) {
+  return `
+    <div
+      class="geojson-cluster-custom-marker"
+      style="width: ${size[0]}px; height: ${size[1]}px;"
+    >
+      ${content}
+    </div>
+  `
+}
+
+function resolveClusterContentValue(value, context) {
+  return typeof value === 'function' ? value(context) : value
 }
 
 function createPinContent(item, style, size) {
@@ -369,20 +398,44 @@ function renderClusterMarker(AMap, marker, count, clusterData, layerStyle) {
 
   const style = mergeStyle(DEFAULT_CLUSTER_STYLE.cluster, layerStyle.cluster)
   const baseSize = normalizePair(style.size, [44, 44])
-  const sizeValue = Math.min(72, baseSize[0] + Math.max(0, String(count).length - 2) * 8)
-  const size = [sizeValue, sizeValue]
+  const useDefaultRenderer = !style.renderer || style.renderer === 'default'
+  const sizeValue = useDefaultRenderer
+    ? Math.min(72, baseSize[0] + Math.max(0, String(count).length - 2) * 8)
+    : baseSize[0]
+  const size = useDefaultRenderer ? [sizeValue, sizeValue] : baseSize
   const color = style.color || '#1677ff'
   const textColor = style.textColor || '#ffffff'
   const borderColor = style.borderColor || '#ffffff'
+  const context = {
+    count,
+    clusterData,
+    style,
+    size
+  }
 
-  marker.setContent(`
-    <div
-      class="geojson-cluster-marker"
-      style="width: ${size[0]}px; height: ${size[1]}px; line-height: ${size[1]}px; background: ${color}; color: ${textColor}; border-color: ${borderColor};"
-    >
-      ${count}
-    </div>
-  `)
+  if (style.renderer === 'image') {
+    const rawSrc = style.image && (style.image.src || style.image.url)
+    const src = resolveClusterContentValue(rawSrc, context)
+    const imageUrl = src ? resolveAssetUrl(src) : ''
+    const label = style.label === false ? '' : resolveClusterContentValue(style.text, context) || count
+
+    marker.setContent(createClusterHtmlContent(`
+      <img src="${imageUrl}" alt="" />
+      ${label === '' ? '' : `<span>${label}</span>`}
+    `, size))
+  } else if (style.renderer === 'html') {
+    const html = resolveClusterContentValue(style.html || style.content, context)
+    marker.setContent(createClusterHtmlContent(html || '', size))
+  } else {
+    marker.setContent(`
+      <div
+        class="geojson-cluster-marker"
+        style="width: ${size[0]}px; height: ${size[1]}px; line-height: ${size[1]}px; background: ${color}; color: ${textColor}; border-color: ${borderColor};"
+      >
+        ${count}
+      </div>
+    `)
+  }
 
   if (typeof marker.setOffset === 'function') {
     marker.setOffset(createPixel(AMap, [-size[0] / 2, -size[1] / 2]))
@@ -583,10 +636,11 @@ function makeClusterLayer(layerId, context) {
     focus(id) {
       const key = id == null ? '' : String(id)
       const item = clusterData.find((entry) => entry.featureId === key)
-      if (!item || !item.lnglat) return
+      const position = item && normalizePosition(item.lnglat)
+      if (!position) return
 
       if (typeof map.setZoomAndCenter === 'function') {
-        map.setZoomAndCenter(toNumber(layerStyle.focusZoom, 16), item.lnglat, true)
+        map.setZoomAndCenter(toNumber(layerStyle.focusZoom, 16), position, true)
       }
     },
 

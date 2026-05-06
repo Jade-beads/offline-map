@@ -240,6 +240,56 @@ mapActions.activateDraw('rectangle')
 mapActions.activateCustomMarker()
 ```
 
+标点完成后，地图层会自动把坐标写入 `mapStore.customMarkerResult`。业务组件可以监听这个字段获取经纬度：
+
+```js
+import { mapActions, mapStore } from '@/map/map-store'
+
+export default {
+  data() {
+    return {
+      mapStore
+    }
+  },
+  watch: {
+    'mapStore.customMarkerResult'(marker) {
+      if (!marker) return
+
+      console.log(marker.position) // [lng, lat]
+      console.log(marker.lng)
+      console.log(marker.lat)
+    }
+  },
+  methods: {
+    pickMarker() {
+      mapActions.activateCustomMarker()
+    }
+  }
+}
+```
+
+`customMarkerResult` 字段说明：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `string` | 本次临时标点 id，格式为 `custom-${timestamp}` |
+| `type` | `custom-marker` | 结果类型 |
+| `position` | `[number, number]` | `[lng, lat]` 经纬度数组 |
+| `lng` | `number` | 经度 |
+| `lat` | `number` | 纬度 |
+| `createdAt` | `number` | 生成时间戳 |
+
+### setCustomMarkerResult(result) / clearCustomMarkerResult()
+
+使用场景：`MapController` 写入自定义标点结果，或业务层开始新一轮选点前主动清空上一次结果。业务层通常只需要调用 `clearCustomMarkerResult()`。
+
+示例：
+
+```js
+mapActions.clearCustomMarkerResult()
+mapActions.activateCustomMarker()
+```
+
 ### zoomIn() / zoomOut()
 
 使用场景：放大或缩小地图。
@@ -505,6 +555,71 @@ mapActions.fitLayerView('bank-cluster', { padding: [80, 80] })
 mapActions.focusFeature('bank-cluster', '9691')
 mapActions.clearLayer('bank-cluster')
 ```
+
+### renderWMSLayer(params)
+
+使用场景：加载 GeoServer 发布的 OGC WMS 图片图层。WMS 是服务端按瓦片返回图片，不是 GeoJSON，所以它不走 `renderGeoJSONLayer()`，也不支持单个 Feature 高亮、分类显隐。
+
+参数：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `params.layerId` | `string` | WMS 图层唯一 id |
+| `params.url` | `string` | GeoServer WMS 地址，例如 `/geoserver/demo/wms` |
+| `params.visible` | `boolean` | 初始是否显示 |
+| `params.opacity` | `number` | 图层透明度，范围 `0 - 1` |
+| `params.zIndex` | `number` | 图层层级 |
+| `params.zooms` | `[number, number]` | 可见缩放级别 |
+| `params.blend` | `boolean` | 缩放切换时是否混合瓦片，透明图层通常建议 `false` |
+| `params.param` | `object` | WMS GetMap 参数，传 `LAYERS`、`VERSION`、`FORMAT`、`TRANSPARENT`、`STYLES` 等 |
+
+示例：
+
+```js
+mapActions.renderWMSLayer({
+  layerId: 'geo-server-grid',
+  url: 'http://内网地址/geoserver/demo/wms',
+  visible: true,
+  opacity: 0.85,
+  zIndex: 60,
+  zooms: [3, 20],
+  blend: false,
+  param: {
+    LAYERS: 'demo:avg_price_grid',
+    VERSION: '1.1.1',
+    FORMAT: 'image/png',
+    TRANSPARENT: true,
+    STYLES: ''
+  }
+})
+```
+
+修改透明度、层级或切换 GeoServer 样式：
+
+```js
+mapActions.patchLayerStyle('geo-server-grid', {
+  opacity: 0.5,
+  zIndex: 80,
+  param: {
+    STYLES: 'heat_style'
+  }
+})
+```
+
+控制显示隐藏和清除：
+
+```js
+mapActions.setLayerVisible('geo-server-grid', false)
+mapActions.setLayerVisible('geo-server-grid', true)
+mapActions.clearLayer('geo-server-grid')
+```
+
+注意事项：
+
+- GeoServer 图层建议发布或支持 `EPSG:3857`，高德 WMS 图层按 Web Mercator 瓦片体系请求。
+- `BBOX`、`WIDTH`、`HEIGHT`、`REQUEST` 不需要业务层传，高德图层会按瓦片自动补。
+- 透明叠加建议使用 `FORMAT: 'image/png'` 和 `TRANSPARENT: true`。
+- 如果前端和 GeoServer 不同域，需要后端开启 CORS 或通过网关转发。
 
 ### setLayerVisible(layerId, visible)
 
@@ -984,6 +1099,57 @@ locaActions.clearAllLayers()
 Loca：海量点、换色、PatchLoca样式、高亮、清高亮、热力、网格、隐藏网点、显示网点、清除Loca、Loca信息、清空Loca
 ```
 
+## 热力图工具条
+
+组件位置：`src/components/HeatmapToolbar.vue`。
+
+使用场景：业务侧渲染热力图后，需要在地图上展示热力值图例，并允许用户控制热力图显示隐藏、透明度。
+
+当前示例：点击左下角 `Loca热力` 按钮后，会使用 `src/examples/loca-feature-examples.js` 中生成的测试点位数据渲染 Loca 热力图，并显示热力图工具条。
+
+参数：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `layerId` | `string` | 被控制的热力图图层 id |
+| `mode` | `loca | map` | `loca` 控制 `locaActions`，`map` 控制 `mapActions` |
+| `title` | `string` | 工具条标题 |
+| `visible` | `boolean` | 初始显示状态 |
+| `opacity` | `number` | 初始热力程度，百分比，例如 `86` |
+| `stops` | `Array` | 图例色带分段，包含 `value`、`color`、`label` |
+| `lowLabel` / `highLabel` | `string` | 色带两端文案 |
+
+示例：
+
+```vue
+<HeatmapToolbar
+  v-if="heatmapToolbarVisible"
+  layer-id="loca-example-heatmap"
+  mode="loca"
+  title="热力图"
+  :visible="true"
+  :opacity="86"
+  :stops="[
+    { value: 0.2, color: '#6b5ea8', label: '913.5万' },
+    { value: 0.45, color: '#84cc16', label: '1,748.7万' },
+    { value: 0.7, color: '#facc15', label: '2,500.1万' },
+    { value: 0.85, color: '#f97316', label: '2,998.8万' },
+    { value: 1, color: '#ef4444', label: '10,834.8万' }
+  ]"
+/>
+```
+
+内部调用：
+
+```js
+locaActions.setLayerVisible(layerId, visible)
+locaActions.patchLayerStyle(layerId, {
+  layerOptions: {
+    opacity: opacity / 100
+  }
+})
+```
+
 完整的一方法一示例索引在：
 
 ```js
@@ -996,3 +1162,60 @@ locaMethodDemos.renderGeoJSONLayer()
 locaMethodDemos.patchLayerStyle()
 locaMethodDemos.highlightFeature()
 ```
+
+## 聚合点 SVG 样式
+
+使用场景：`mapActions.renderGeoJSONClusterLayer()` 渲染点聚合时，需要把聚合点本身改成自定义 SVG 或图片。这里修改的是 `style.cluster`，不是单点的 `style.point`。
+
+内联 SVG 示例：
+
+```js
+mapActions.renderGeoJSONClusterLayer({
+  layerId: 'bank-cluster',
+  visible: true,
+  style: {
+    gridSize: 80,
+    cluster: {
+      renderer: 'html',
+      size: [52, 52],
+      html: ({ count }) => `
+        <svg width="52" height="52" viewBox="0 0 52 52">
+          <circle cx="26" cy="26" r="23" fill="#1677ff" stroke="#fff" stroke-width="3"/>
+          <text x="26" y="31" text-anchor="middle" font-size="16" fill="#fff">${count}</text>
+        </svg>
+      `
+    }
+  }
+}, geoJSON)
+```
+
+SVG/PNG 文件示例：
+
+```js
+mapActions.renderGeoJSONClusterLayer({
+  layerId: 'bank-cluster',
+  visible: true,
+  style: {
+    gridSize: 80,
+    cluster: {
+      renderer: 'image',
+      size: [52, 52],
+      image: {
+        src: '/cluster-icons/bank-cluster.svg'
+      },
+      text: ({ count }) => count
+    }
+  }
+}, geoJSON)
+```
+
+字段说明：
+
+| 字段 | 说明 |
+| --- | --- |
+| `cluster.renderer` | `html` 使用内联 HTML/SVG，`image` 使用 SVG/PNG 图片，不传则使用默认圆形数字样式 |
+| `cluster.size` | 聚合点尺寸，例如 `[52, 52]` |
+| `cluster.html` / `cluster.content` | `renderer: 'html'` 时使用，支持字符串或函数 |
+| `cluster.image.src` / `cluster.image.url` | `renderer: 'image'` 时使用，支持本地路径、data URL、http 地址，也支持函数 |
+| `cluster.text` | `renderer: 'image'` 时覆盖在图片上的数字文案，支持函数 |
+| `cluster.label` | 设为 `false` 时，图片模式不显示覆盖文案 |

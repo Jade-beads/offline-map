@@ -1,5 +1,6 @@
 import { createClusterLayer } from './cluster-layer-registry'
 import { createLayer } from './layer-registry'
+import { createWMSLayer } from './wms-layer-registry'
 
 const DRAW_OPTIONS = {
   fillColor: '#5f97f0',
@@ -142,6 +143,7 @@ export class MapController {
       'zoom:out': () => this.zoomOut(),
       'map:center-by-coordinate': () => this.centerByCoordinate(command.payload),
       'cluster:render': () => this.renderClusterLayer(command.payload),
+      'wms:render': () => this.renderWMSLayer(command.payload),
       'layer:render': () => this.renderLayer(command.payload),
       'layer:visible': () => this.setLayerVisible(command.payload),
       'layer:style': () => this.setLayerStyle(command.payload),
@@ -197,6 +199,26 @@ export class MapController {
       defaultProperties: payload.defaultProperties,
       events: payload.events
     })
+
+    if (payload.visible === false) {
+      layer.hide()
+      this.syncLayerInfo(payload.layerId, layer)
+      return
+    }
+
+    if (payload.visible === true || !layerExists) {
+      layer.show()
+    }
+
+    this.syncLayerInfo(payload.layerId, layer)
+  }
+
+  renderWMSLayer(payload = {}) {
+    if (!payload.layerId) return
+
+    const layerExists = this.layers.has(payload.layerId)
+    const layer = this.getWMSLayer(payload.layerId)
+    layer.setData(payload)
 
     if (payload.visible === false) {
       layer.hide()
@@ -444,13 +466,16 @@ export class MapController {
 
     this.customMarkerHandler = (event) => {
       const position = toLngLatArray(event.lnglat)
+      if (!position) return
+
+      const markerId = `custom-${Date.now()}`
       const marker = new this.AMap.Marker({
         position: event.lnglat,
         content: '<div class="custom-map-marker"><span></span></div>',
         offset: new this.AMap.Pixel(-12, -24),
         title: '自定义标点',
         extData: {
-          id: `custom-${Date.now()}`,
+          id: markerId,
           type: 'custom-marker',
           position
         }
@@ -458,6 +483,16 @@ export class MapController {
 
       this.map.add(marker)
       this.customMarkers.push(marker)
+      if (this.actions.setCustomMarkerResult) {
+        this.actions.setCustomMarkerResult({
+          id: markerId,
+          type: 'custom-marker',
+          position,
+          lng: position[0],
+          lat: position[1],
+          createdAt: Date.now()
+        })
+      }
       this.clearCustomMarkerHandler()
       if (this.actions.setActiveTool) {
         this.actions.setActiveTool('')
@@ -510,6 +545,25 @@ export class MapController {
     }
 
     const layer = createClusterLayer(layerId, {
+      AMap: this.AMap,
+      map: this.map
+    })
+    this.layers.set(layerId, layer)
+
+    return layer
+  }
+
+  getWMSLayer(layerId) {
+    const existingLayer = this.layers.get(layerId)
+    if (existingLayer && existingLayer.getType && existingLayer.getType() === 'wms') {
+      return existingLayer
+    }
+
+    if (existingLayer && existingLayer.destroy) {
+      existingLayer.destroy()
+    }
+
+    const layer = createWMSLayer(layerId, {
       AMap: this.AMap,
       map: this.map
     })
