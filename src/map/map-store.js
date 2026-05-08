@@ -45,7 +45,11 @@ export const mapStore = Vue.observable({
   commandQueue: [],
   layerRegistry: {},
   drawResult: null,
+  drawOverlayInfo: null,
+  drawOverlayAction: null,
+  coordinatePickResult: null,
   customMarkerResult: null,
+  customMarkerSaveRequest: null,
   viewport: {
     center: [117.2272, 31.8206],
     zoom: 11,
@@ -81,12 +85,44 @@ export const mapActions = {
     mapStore.drawResult = null
   },
 
+  setDrawOverlayInfo(info) {
+    mapStore.drawOverlayInfo = info
+  },
+
+  clearDrawOverlayInfo() {
+    mapStore.drawOverlayInfo = null
+  },
+
+  setDrawOverlayAction(action) {
+    mapStore.drawOverlayAction = action
+  },
+
+  clearDrawOverlayAction() {
+    mapStore.drawOverlayAction = null
+  },
+
+  setCoordinatePickResult(result) {
+    mapStore.coordinatePickResult = result
+  },
+
+  clearCoordinatePickResult() {
+    mapStore.coordinatePickResult = null
+  },
+
   setCustomMarkerResult(result) {
     mapStore.customMarkerResult = result
   },
 
   clearCustomMarkerResult() {
     mapStore.customMarkerResult = null
+  },
+
+  setCustomMarkerSaveRequest(request) {
+    mapStore.customMarkerSaveRequest = request
+  },
+
+  clearCustomMarkerSaveRequest() {
+    mapStore.customMarkerSaveRequest = null
   },
 
   setLayerInfo(layerId, info = {}) {
@@ -146,10 +182,59 @@ export const mapActions = {
     this.dispatchMapCommand('draw:start', { shape })
   },
 
+  clearDrawOverlay() {
+    mapStore.activeTool = ''
+    this.dispatchMapCommand('draw:overlay:clear')
+  },
+
+  startEditDrawOverlay(id) {
+    mapStore.activeTool = 'draw:edit'
+    this.dispatchMapCommand('draw:overlay:edit-start', {
+      id
+    })
+  },
+
+  stopEditDrawOverlay() {
+    mapStore.activeTool = ''
+    this.dispatchMapCommand('draw:overlay:edit-stop')
+  },
+
+  deleteDrawOverlay(id) {
+    mapStore.activeTool = ''
+    this.dispatchMapCommand('draw:overlay:delete', {
+      id
+    })
+  },
+
+  activateCoordinatePicker() {
+    this.clearCoordinatePickResult()
+    this.dispatchMapCommand('coordinate-picker:start')
+    mapStore.activeTool = 'coordinate-picker'
+  },
+
   activateCustomMarker() {
     mapStore.activeTool = 'custom-marker'
     this.clearCustomMarkerResult()
     this.dispatchMapCommand('marker:start')
+  },
+
+  updateCustomMarkerName(id, name) {
+    this.dispatchMapCommand('marker:update-name', {
+      id,
+      name
+    })
+  },
+
+  deleteCustomMarker(id) {
+    this.dispatchMapCommand('marker:delete', {
+      id
+    })
+  },
+
+  saveCustomMarker(id) {
+    this.dispatchMapCommand('marker:save', {
+      id
+    })
   },
 
   zoomIn() {
@@ -339,6 +424,22 @@ export const mapActions = {
     }
 
     this.dispatchMapCommand('wms:render', {
+      ...renderParams,
+      layerId
+    })
+  },
+
+  renderVectorTileLayer(params) {
+    const renderParams = typeof params === 'string'
+      ? { layerId: params }
+      : params || {}
+    const layerId = renderParams.layerId
+
+    if (!layerId) {
+      return
+    }
+
+    this.dispatchMapCommand('vector-tile:render', {
       ...renderParams,
       layerId
     })

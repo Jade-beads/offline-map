@@ -12,6 +12,9 @@
       <button class="icon-button search-button" type="button" title="定位坐标" @click="actions.searchCoordinate(keyword)">
         <span class="icon search-icon"></span>
       </button>
+      <button class="tool-button" :class="{ active: store.activeTool === 'coordinate-picker' }" type="button" title="拾取坐标" @click="actions.activateCoordinatePicker()">
+        <span class="icon coordinate-icon"></span>
+      </button>
       <button class="tool-button" :class="{ active: store.activeTool === 'ruler' }" type="button" title="测距" @click="actions.activateRuler()">
         <span class="icon ruler-icon"></span>
       </button>
@@ -41,7 +44,12 @@
       </button>
     </section>
 
-    <section v-if="store.activeTool === 'ruler'" class="tool-status">
+    <section v-if="store.activeTool === 'coordinate-picker'" class="tool-status">
+      <span>坐标拾取中：点击地图获取坐标并复制。</span>
+      <button type="button" @click="actions.setActiveTool('')">取消</button>
+    </section>
+
+    <section v-else-if="store.activeTool === 'ruler'" class="tool-status">
       <span>测距中：在地图上点击两个或多个点，双击或右键结束。</span>
       <button type="button" @click="actions.restartRuler()">重新选择</button>
       <button type="button" @click="actions.clearRuler()">删除</button>
@@ -81,6 +89,7 @@
         <el-button size="mini" @click="handleClearPrefixLayer">清前缀</el-button>
         <el-button size="mini" @click="handleRenderClusterLayer">点聚合</el-button>
         <el-button size="mini" @click="handleClearClusterLayer">清聚合</el-button>
+        <el-button size="mini" @click="handleRenderMvGridThinning">加载MVT</el-button>
         <el-button size="mini" @click="handleShowFeatureInfo">要素信息</el-button>
         <el-button size="mini" @click="handleShowLayerInfo">图层信息</el-button>
         <el-button size="mini" @click="handleClearAllMapLayers">清空地图</el-button>
@@ -124,6 +133,9 @@ import {
   updateRegionBoundaryStyleExample
 } from '../examples/map-feature-examples'
 import {
+  renderMvGridThinningVectorTileExample
+} from '../examples/vector-tile-feature-examples'
+import {
   clearAllLocaLayersExample,
   clearLocaFeatureStyleExample,
   clearLocaExamples,
@@ -162,6 +174,13 @@ export default {
         { value: 0.85, color: '#f97316', label: '2,998.8万' },
         { value: 1, color: '#ef4444', label: '10,834.8万' }
       ]
+    }
+  },
+  watch: {
+    'store.coordinatePickResult'(result) {
+      if (!result || !result.coordinate) return
+
+      this.keyword = result.coordinate
     }
   },
   methods: {
@@ -215,6 +234,10 @@ export default {
     },
     handleClearClusterLayer() {
       clearClusterLayerExample()
+    },
+    handleRenderMvGridThinning() {
+      renderMvGridThinningVectorTileExample()
+      this.showMessage('已触发 MVT 图层加载')
     },
     handleShowFeatureInfo() {
       const feature = getMixedFeatureInfoExample(EXAMPLE_FEATURE_IDS.point)
@@ -386,6 +409,26 @@ export default {
   background: currentColor;
   transform: rotate(45deg);
   transform-origin: center;
+}
+
+.coordinate-icon::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.coordinate-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(currentColor, currentColor) center / 2px 18px no-repeat,
+    linear-gradient(currentColor, currentColor) center / 18px 2px no-repeat;
 }
 
 .ruler-icon::before {

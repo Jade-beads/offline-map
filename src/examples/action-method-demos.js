@@ -38,6 +38,11 @@ import {
   setLocaBranchCategoryVisible,
   updateLocaMassPointStyleExample
 } from './loca-feature-examples'
+import {
+  patchAvgPriceVectorTileStyleExample,
+  renderAvgPriceVectorTileExample,
+  renderMvGridThinningVectorTileExample
+} from './vector-tile-feature-examples'
 
 export const mapMethodDemos = {
   setActiveTool: () => mapActions.setActiveTool('demo-tool'),
@@ -45,6 +50,14 @@ export const mapMethodDemos = {
   clearHandledCommands: () => mapActions.clearHandledCommands(0),
   setDrawResult: () => mapActions.setDrawResult(null),
   clearDrawResult: () => mapActions.clearDrawResult(),
+  setCoordinatePickResult: () => mapActions.setCoordinatePickResult({
+    position: [117.2272, 31.8206],
+    lng: 117.2272,
+    lat: 31.8206,
+    coordinate: '117.2272,31.8206',
+    timestamp: Date.now()
+  }),
+  clearCoordinatePickResult: () => mapActions.clearCoordinatePickResult(),
   setCustomMarkerResult: () => mapActions.setCustomMarkerResult({
     id: 'demo-custom-marker',
     type: 'custom-marker',
@@ -63,15 +76,19 @@ export const mapMethodDemos = {
   clearRuler: () => mapActions.clearRuler(),
   restartRuler: () => mapActions.restartRuler(),
   activateDraw: () => mapActions.activateDraw('polygon'),
+  activateCoordinatePicker: () => mapActions.activateCoordinatePicker(),
   activateCustomMarker: () => mapActions.activateCustomMarker(),
   zoomIn: () => mapActions.zoomIn(),
   zoomOut: () => mapActions.zoomOut(),
   searchCoordinate: () => mapActions.searchCoordinate('117.2272,31.8206'),
   renderGeoJSONLayer: () => renderMixedOverlayExample(),
   renderGeoJSONClusterLayer: () => renderClusterLayerExample(),
+  renderVectorTileLayer: () => renderAvgPriceVectorTileExample(),
+  renderMvGridThinningVectorTileLayer: () => renderMvGridThinningVectorTileExample(),
   setLayerVisible: () => setMixedLayerVisibleExample(false),
   setLayerStyle: () => updateRegionBoundaryStyleExample(),
   patchLayerStyle: () => patchMixedLayerStyleExample(),
+  patchVectorTileLayerStyle: () => patchAvgPriceVectorTileStyleExample(),
   patchGeoJSONClusterLayerStyle: () => patchClusterLayerStyleExample(),
   setLayerCategoryVisible: () => setMixedCategoryVisibleExample('point', false),
   setFeaturesVisible: () => setMixedFeatureVisibleExample(EXAMPLE_FEATURE_IDS.point, false),

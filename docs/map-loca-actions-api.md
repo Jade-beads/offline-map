@@ -213,11 +213,93 @@ export default {
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
+| `id` | `string` | 本次绘图覆盖物 id，可用于后续编辑或删除 |
 | `shape` | `rectangle | circle | polygon` | 绘制类型 |
 | `geoJSON` | `Feature` | 绘制结果。矩形/多边形为 `Polygon`，圆形为带 `properties.radius` 的 `Point` |
 | `bounds` | `object | null` | `{ southWest, northEast }` 边界信息 |
 | `thumbnail` | `string` | 地图 canvas 截图，base64 png |
 | `thumbnailError` | `string` | 截图失败原因，常见于跨域瓦片导致 canvas 被污染 |
+
+绘制完成后，地图层还会维护 `mapStore.drawOverlayInfo`，用于描述当前地图上临时绘图覆盖物的生命周期状态：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `string` | 当前激活的绘图覆盖物 id |
+| `shape` | `rectangle | circle | polygon` | 当前激活覆盖物类型 |
+| `editing` | `boolean` | 当前覆盖物是否处于编辑状态 |
+| `overlayCount` | `number` | 地图上保留的临时绘图覆盖物数量 |
+
+绘图覆盖物支持右键菜单。用户在已绘制图形上右键时，菜单会根据当前状态动态展示，点击任意菜单动作后会自动收起：
+
+| 菜单项 | 说明 |
+| --- | --- |
+| 编辑图形 | 当前图形未编辑且离线包具备对应 Editor 时展示。圆形使用 `AMap.CircleEditor`，矩形优先使用 `AMap.RectangleEditor`，多边形使用 `AMap.PolygonEditor` |
+| 完成编辑 | 当前图形正在编辑时展示。关闭编辑器，并把修改后的 `geoJSON` / `bounds` / `thumbnail` 写回 `mapStore.drawResult` |
+| 删除图形 | 删除当前右键命中的绘图覆盖物，并清空当前 `drawResult` |
+| 清空绘图 | 地图上存在多个临时绘图覆盖物时展示。删除所有临时绘图覆盖物，并清空 `drawResult` |
+
+如果业务层需要维护多个临时图形，建议监听 `mapStore.drawOverlayAction`，它表示“本次发生的绘图操作”。`drawResult` 仍然表示当前图形结果，`drawOverlayAction` 用来告诉业务层应该新增、更新、删除还是清空列表。
+
+`drawOverlayAction` 字段说明：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `type` | `create | update | edit-start | edit-stop | delete | clear` | 本次操作类型 |
+| `id` | `string` | 被操作的图形 id，`clear` 时为空字符串 |
+| `shape` | `rectangle | circle | polygon | string` | 被操作的图形类型，`clear` 时为空字符串 |
+| `result` | `object | null` | 当前操作对应的图形结果，结构同 `drawResult` |
+| `overlayCount` | `number` | 操作后地图上剩余的临时绘图覆盖物数量 |
+| `timestamp` | `number` | 操作产生时间戳 |
+| `ids` | `string[]` | 仅 `clear` 时存在，表示被清空的图形 id 列表 |
+| `records` | `Array<{ id, shape, result }>` | 仅 `clear` 时存在，表示被清空图形的快照 |
+
+多个图形列表维护示例：
+
+```js
+import { mapActions, mapStore } from '@/map/map-store'
+
+export default {
+  data() {
+    return {
+      mapStore,
+      drawList: []
+    }
+  },
+  watch: {
+    'mapStore.drawOverlayAction'(action) {
+      if (!action) return
+
+      if (['create', 'update', 'edit-stop'].includes(action.type) && action.result) {
+        const index = this.drawList.findIndex((item) => item.id === action.id)
+        if (index > -1) {
+          this.$set(this.drawList, index, action.result)
+        } else {
+          this.drawList.push(action.result)
+        }
+      }
+
+      if (action.type === 'delete') {
+        this.drawList = this.drawList.filter((item) => item.id !== action.id)
+      }
+
+      if (action.type === 'clear') {
+        this.drawList = []
+      }
+    }
+  },
+  methods: {
+    edit(row) {
+      mapActions.startEditDrawOverlay(row.id)
+    },
+    remove(row) {
+      mapActions.deleteDrawOverlay(row.id)
+    },
+    clearAll() {
+      mapActions.clearDrawOverlay()
+    }
+  }
+}
+```
 
 ### clearDrawResult()
 
@@ -229,6 +311,89 @@ export default {
 mapActions.clearDrawResult()
 mapActions.activateDraw('rectangle')
 ```
+
+注意：`clearDrawResult()` 只清空结果数据，不会删除地图上的绘图覆盖物。如果要删除地图上的临时图形，请使用下面的覆盖物生命周期方法。
+
+### clearDrawOverlay()
+
+使用场景：清空地图上所有通过 `activateDraw()` 画出来的临时覆盖物，同时清空 `mapStore.drawResult` 和 `mapStore.drawOverlayInfo`。
+
+示例：
+
+```js
+mapActions.clearDrawOverlay()
+```
+
+### startEditDrawOverlay(id)
+
+使用场景：业务层通过按钮开启指定绘图覆盖物的编辑能力。`id` 不传时，默认编辑当前激活或最近一次绘制的覆盖物。
+
+参数：
+
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `id` | `string` | 可选，`mapStore.drawResult.id` 或 `mapStore.drawOverlayInfo.id` |
+
+示例：
+
+```js
+mapActions.startEditDrawOverlay(mapStore.drawResult.id)
+```
+
+### stopEditDrawOverlay()
+
+使用场景：结束当前绘图覆盖物编辑，并把修改后的结果写回 `mapStore.drawResult`。
+
+示例：
+
+```js
+mapActions.stopEditDrawOverlay()
+```
+
+### deleteDrawOverlay(id)
+
+使用场景：删除指定绘图覆盖物。`id` 不传时，默认删除当前激活或最近一次绘制的覆盖物。
+
+示例：
+
+```js
+mapActions.deleteDrawOverlay(mapStore.drawResult.id)
+```
+
+### activateCoordinatePicker()
+
+使用场景：业务层需要让用户在地图上点击一次，获取该位置经纬度，同时把坐标文本复制到剪贴板。顶部工具条的“拾取坐标”按钮就是调用这个方法。
+
+调用后地图层会先退出测距、绘图、临时标点等占用点击事件的工具，然后等待下一次地图左键点击。点击完成后，地图层会写入 `mapStore.coordinatePickResult`，并把 `activeTool` 清空。
+
+示例：
+
+```js
+mapActions.activateCoordinatePicker()
+```
+
+结果监听：
+
+```js
+watch: {
+  'mapStore.coordinatePickResult'(result) {
+    if (!result) return
+
+    console.log(result.position) // [lng, lat]
+    console.log(result.coordinate) // "lng,lat"
+  }
+}
+```
+
+`coordinatePickResult` 字段说明：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `position` | `[number, number]` | 经纬度数组 |
+| `lng` | `number` | 经度 |
+| `lat` | `number` | 纬度 |
+| `coordinate` | `string` | 逗号拼接后的坐标文本，会被自动复制 |
+| `timestamp` | `number` | 拾取时间戳 |
 
 ### activateCustomMarker()
 
@@ -258,6 +423,7 @@ export default {
       console.log(marker.position) // [lng, lat]
       console.log(marker.lng)
       console.log(marker.lat)
+      console.log(marker.name)
     }
   },
   methods: {
@@ -274,10 +440,79 @@ export default {
 | --- | --- | --- |
 | `id` | `string` | 本次临时标点 id，格式为 `custom-${timestamp}` |
 | `type` | `custom-marker` | 结果类型 |
+| `name` | `string` | 锚点名称，默认 `自定义锚点`，可通过右键菜单或 `updateCustomMarkerName()` 修改 |
 | `position` | `[number, number]` | `[lng, lat]` 经纬度数组 |
 | `lng` | `number` | 经度 |
 | `lat` | `number` | 纬度 |
 | `createdAt` | `number` | 生成时间戳 |
+| `updatedAt` | `number` | 最近一次修改时间戳 |
+
+自定义锚点支持右键菜单。用户在锚点上右键时，菜单包含下面几个动作；点击任意动作后菜单会自动收起：
+
+| 菜单项 | 说明 |
+| --- | --- |
+| 修改名称 | 弹出名称输入框，确认后更新锚点名称、`title`、`label` 和 `customMarkerResult` |
+| 保存锚点 | 不直接请求接口，而是写入 `mapStore.customMarkerSaveRequest`，由业务层监听后调用接口 |
+| 删除锚点 | 删除当前锚点，并清空当前 `customMarkerResult` |
+
+业务层保存接口示例：
+
+```js
+import { mapActions, mapStore } from '@/map/map-store'
+
+export default {
+  data() {
+    return {
+      mapStore
+    }
+  },
+  watch: {
+    async 'mapStore.customMarkerSaveRequest'(marker) {
+      if (!marker) return
+
+      await saveAnchorApi({
+        id: marker.id,
+        name: marker.name,
+        lng: marker.lng,
+        lat: marker.lat,
+        position: marker.position
+      })
+
+      mapActions.clearCustomMarkerSaveRequest()
+    }
+  }
+}
+```
+
+### updateCustomMarkerName(id, name)
+
+使用场景：业务层通过自己的表单修改指定锚点名称。`id` 不传时，默认修改当前激活或最近一次创建的锚点。
+
+示例：
+
+```js
+mapActions.updateCustomMarkerName(mapStore.customMarkerResult.id, '客户A')
+```
+
+### saveCustomMarker(id)
+
+使用场景：业务层通过按钮触发保存请求。地图层会把锚点信息写入 `mapStore.customMarkerSaveRequest`，业务层监听后调用接口。
+
+示例：
+
+```js
+mapActions.saveCustomMarker(mapStore.customMarkerResult.id)
+```
+
+### deleteCustomMarker(id)
+
+使用场景：删除指定自定义锚点。`id` 不传时，默认删除当前激活或最近一次创建的锚点。
+
+示例：
+
+```js
+mapActions.deleteCustomMarker(mapStore.customMarkerResult.id)
+```
 
 ### setCustomMarkerResult(result) / clearCustomMarkerResult()
 

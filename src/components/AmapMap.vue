@@ -135,7 +135,7 @@ export default {
       cleanupMapCompleteObserver: null,
       moveEndHandler: null,
       zoomEndHandler: null,
-      rightClickHandler: null,
+      coordinatePickHandler: null,
       coordinateCopyTip: '',
       coordinateCopyTipTimer: null,
       loading: true,
@@ -150,6 +150,13 @@ export default {
     },
     'locaStore.commandSeq'() {
       this.drainLocaCommandQueue()
+    },
+    'store.activeTool'(tool) {
+      if (tool === 'coordinate-picker') {
+        this.bindCoordinatePicker()
+      } else {
+        this.clearCoordinatePicker()
+      }
     }
   },
   mounted() {
@@ -186,6 +193,9 @@ export default {
 
       this.setupLocaController(AMap, map)
       this.drainCommandQueue()
+      if (this.store.activeTool === 'coordinate-picker') {
+        this.bindCoordinatePicker()
+      }
     } catch (error) {
       const message = error && error.message ? error.message : '请检查 public/amap 离线资源包。'
       this.errorMessage = `高德地图加载失败：${message}`
@@ -201,6 +211,7 @@ export default {
     }
 
     this.clearMapEvents()
+    this.clearCoordinatePicker()
     this.clearCoordinateCopyTip()
 
     if (this.locaController) {
@@ -234,21 +245,8 @@ export default {
         })
       }
 
-      this.rightClickHandler = (event) => {
-        const lnglat = toLngLatArray(event && event.lnglat)
-        if (!lnglat) return
-
-        const coordinate = lnglat.join(',')
-        this.copyTextToClipboard(coordinate).then((copied) => {
-          if (copied) {
-            this.showCoordinateCopyTip(`坐标已复制：${coordinate}`)
-          }
-        })
-      }
-
       map.on('moveend', this.moveEndHandler)
       map.on('zoomend', this.zoomEndHandler)
-      map.on('rightclick', this.rightClickHandler)
     },
     clearMapEvents() {
       if (!this.map || typeof this.map.off !== 'function') return
@@ -263,10 +261,43 @@ export default {
         this.zoomEndHandler = null
       }
 
-      if (this.rightClickHandler) {
-        this.map.off('rightclick', this.rightClickHandler)
-        this.rightClickHandler = null
+      this.clearCoordinatePicker()
+    },
+    bindCoordinatePicker() {
+      if (!this.map || typeof this.map.on !== 'function') return
+
+      this.clearCoordinatePicker()
+      this.coordinatePickHandler = (event) => {
+        const lnglat = toLngLatArray(event && event.lnglat)
+        if (!lnglat) return
+
+        this.clearCoordinatePicker()
+        const coordinate = lnglat.join(',')
+        mapActions.setCoordinatePickResult({
+          position: lnglat,
+          lng: lnglat[0],
+          lat: lnglat[1],
+          coordinate,
+          timestamp: Date.now()
+        })
+        this.copyTextToClipboard(coordinate).then((copied) => {
+          if (copied) {
+            this.showCoordinateCopyTip(`坐标已复制：${coordinate}`)
+          }
+        })
+        mapActions.setActiveTool('')
       }
+
+      this.map.on('click', this.coordinatePickHandler)
+    },
+    clearCoordinatePicker() {
+      if (!this.map || !this.coordinatePickHandler || typeof this.map.off !== 'function') {
+        this.coordinatePickHandler = null
+        return
+      }
+
+      this.map.off('click', this.coordinatePickHandler)
+      this.coordinatePickHandler = null
     },
     copyTextToClipboard(text) {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {

@@ -1,13 +1,30 @@
 import { describe, expect, test } from 'bun:test'
-import { createBankPointGeoJSON, createBankRadiusGeoJSON } from '../src/map-business'
+import {
+  BUSINESS_POI_CLUSTER_LAYER_ID,
+  DISTRICT_COUNT_LAYER_ID,
+  createBankPointGeoJSON,
+  createBankRadiusGeoJSON,
+  createDistrictCountGeoJSON,
+  createDistrictCountGeoJSONFromPoiRecords,
+  createPoiClusterDistrictZoomRenderer,
+  createPoiPointGeoJSON,
+  renderPoiClusterOrDistrictCount,
+  renderDistrictCountPoints
+} from '../src/map-business'
 import { createClusterData, createClusterLayer, getClusterFeatures } from '../src/map/cluster-layer-registry'
 import { createLayer } from '../src/map/layer-registry'
 import { MapController } from '../src/map/map-controller'
 import { mapActions, mapStore } from '../src/map/map-store'
 import { resolveFeatureStyle } from '../src/map/style-resolver'
+import { createVectorTileLayer } from '../src/map/vector-tile-layer-registry'
 import { createWMSLayer } from '../src/map/wms-layer-registry'
 import { createLocaLayer } from '../src/loca/loca-layer-registry'
 import { locaActions, locaStore } from '../src/loca/loca-store'
+import {
+  MV_GRID_THINNING_LAYER_ID,
+  MV_GRID_THINNING_URL,
+  renderMvGridThinningVectorTileExample
+} from '../src/examples/vector-tile-feature-examples'
 
 const bankRecords = [
   {
@@ -27,6 +44,63 @@ const bankRecords = [
       type: 'Point',
       coordinates: [121.55, 31.24]
     }
+  }
+]
+
+const districtCountRecords = [
+  {
+    districtName: '崇明区',
+    geom: [121.397516, 31.626946],
+    num: 53036
+  },
+  {
+    districtName: '浦东新区',
+    geom: {
+      type: 'Point',
+      coordinates: [121.544346, 31.221461]
+    },
+    num: 128806
+  },
+  {
+    districtName: '无效坐标',
+    geom: []
+  }
+]
+
+const poiBusinessRecords = [
+  {
+    id: 863849,
+    codeCoun: '310113',
+    geom: {
+      type: 'Point',
+      coordinates: [121.494812, 31.37059]
+    },
+    name: '肆拾玖商店',
+    nameCoun: '宝山区',
+    pointX: 121.494812,
+    pointY: 31.37059,
+    showTag: '便利店'
+  },
+  {
+    id: 863850,
+    codeCoun: '310113',
+    geom: {
+      type: 'Point',
+      coordinates: [121.497, 31.372]
+    },
+    name: '便利店二店',
+    nameCoun: '宝山区',
+    showTag: '便利店'
+  },
+  {
+    id: 863851,
+    codeCoun: '310151',
+    geom: [],
+    name: '崇明门店',
+    nameCoun: '崇明区',
+    pointX: 121.397516,
+    pointY: 31.626946,
+    showTag: '便利店'
   }
 ]
 
@@ -60,6 +134,14 @@ class FakeBounds {
   constructor(southWest, northEast) {
     this.southWest = southWest
     this.northEast = northEast
+  }
+
+  getSouthWest() {
+    return this.southWest
+  }
+
+  getNorthEast() {
+    return this.northEast
   }
 }
 
@@ -129,13 +211,24 @@ class FakeMarker {
   on(type, handler) {
     this.handlers[type] = handler
   }
+
+  off(type, handler) {
+    if (!handler || this.handlers[type] === handler) {
+      delete this.handlers[type]
+    }
+  }
 }
 
 class FakeVectorOverlay {
   constructor(options = {}) {
+    this.handlers = {}
     this.options = options
     this.extData = options.extData || null
     this.visible = options.visible !== false
+    this.path = options.path || []
+    this.bounds = options.bounds || null
+    this.center = options.center || null
+    this.radius = options.radius
   }
 
   show() {
@@ -157,12 +250,113 @@ class FakeVectorOverlay {
     this.radius = radius
   }
 
+  setExtData(extData) {
+    this.extData = extData
+  }
+
   getExtData() {
     return this.extData
   }
 
-  on() {}
+  getPath() {
+    return this.path
+  }
+
+  getBounds() {
+    return this.bounds
+  }
+
+  getCenter() {
+    return this.center
+  }
+
+  getRadius() {
+    return this.radius
+  }
+
+  on(type, handler) {
+    this.handlers[type] = handler
+  }
+
+  off(type, handler) {
+    if (!handler || this.handlers[type] === handler) {
+      delete this.handlers[type]
+    }
+  }
 }
+
+class FakeDrawEditor {
+  constructor(map, overlay, options = {}) {
+    this.map = map
+    this.overlay = overlay
+    this.options = options
+    this.handlers = {}
+    FakeDrawEditor.instances.push(this)
+  }
+
+  setTarget(overlay) {
+    this.overlay = overlay
+  }
+
+  getTarget() {
+    return this.overlay
+  }
+
+  open() {
+    this.opened = true
+  }
+
+  close() {
+    this.closed = true
+    this.emit('end', {
+      target: this.overlay
+    })
+  }
+
+  destroy() {
+    this.destroyed = true
+  }
+
+  on(type, handler) {
+    this.handlers[type] = handler
+  }
+
+  off(type, handler) {
+    if (!handler || this.handlers[type] === handler) {
+      delete this.handlers[type]
+    }
+  }
+
+  emit(type, event = {}) {
+    if (typeof this.handlers[type] === 'function') {
+      this.handlers[type](event)
+    }
+  }
+}
+FakeDrawEditor.instances = []
+
+class FakeContextMenu {
+  constructor() {
+    this.items = []
+    FakeContextMenu.instances.push(this)
+  }
+
+  addItem(label, handler, index) {
+    this.items.push({ label, handler, index })
+  }
+
+  open(map, lnglat) {
+    this.opened = {
+      map,
+      lnglat
+    }
+  }
+
+  close() {
+    this.closed = true
+  }
+}
+FakeContextMenu.instances = []
 
 class FakeMarkerCluster {
   constructor(map, data, options) {
@@ -215,7 +409,7 @@ class FakeWMSLayer {
   constructor(options = {}) {
     this.options = options
     this.visible = options.visible !== false
-    this.params = options.param || {}
+    this.params = options.params || options.param || {}
     FakeWMSLayer.instances.push(this)
   }
 
@@ -257,6 +451,65 @@ class FakeWMSLayer {
 }
 FakeWMSLayer.instances = []
 
+class FakeMapboxVectorTileLayer {
+  constructor(options = {}) {
+    this.options = options
+    this.visible = options.visible !== false
+    this.styles = options.styles || {}
+    this.handlers = {}
+    FakeMapboxVectorTileLayer.instances.push(this)
+  }
+
+  setStyles(styles) {
+    this.styles = styles
+    this.options.styles = styles
+  }
+
+  setOpacity(opacity) {
+    this.opacity = opacity
+    this.options.opacity = opacity
+  }
+
+  setzIndex(zIndex) {
+    this.zIndex = zIndex
+    this.options.zIndex = zIndex
+  }
+
+  setZooms(zooms) {
+    this.zooms = zooms
+    this.options.zooms = zooms
+  }
+
+  show() {
+    this.visible = true
+  }
+
+  hide() {
+    this.visible = false
+  }
+
+  on(type, handler, option) {
+    this.handlers[type] = { handler, option }
+  }
+
+  off(type) {
+    delete this.handlers[type]
+  }
+
+  filterByRect(rect, type) {
+    return [{ rect, type }]
+  }
+
+  reload() {
+    this.reloaded = true
+  }
+
+  destroy() {
+    this.destroyed = true
+  }
+}
+FakeMapboxVectorTileLayer.instances = []
+
 function createFakeAMap() {
   return {
     Pixel: FakePixel,
@@ -266,7 +519,12 @@ function createFakeAMap() {
     Circle: FakeVectorOverlay,
     Polyline: FakeVectorOverlay,
     Polygon: FakeVectorOverlay,
+    PolygonEditor: FakeDrawEditor,
+    CircleEditor: FakeDrawEditor,
+    RectangleEditor: FakeDrawEditor,
+    ContextMenu: FakeContextMenu,
     MarkerCluster: FakeMarkerCluster,
+    MapboxVectorTileLayer: FakeMapboxVectorTileLayer,
     TileLayer: {
       WMS: FakeWMSLayer
     }
@@ -385,6 +643,10 @@ function createFakeLoca() {
   }
 }
 
+function waitForTimers(ms = 100) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 describe('bank map business helpers', () => {
   test('converts business bank records to point GeoJSON with category', () => {
     const geoJSON = createBankPointGeoJSON(bankRecords)
@@ -402,6 +664,122 @@ describe('bank map business helpers', () => {
     expect(geoJSON.features[0].id).toBe('9691-radius')
     expect(geoJSON.features[0].properties.radius).toBe(1200)
     expect(geoJSON.features[0].properties.sourceFeatureId).toBe('9691')
+  })
+})
+
+describe('district count map business helpers', () => {
+  test('converts district count records to point GeoJSON', () => {
+    const geoJSON = createDistrictCountGeoJSON(districtCountRecords)
+
+    expect(geoJSON.features).toHaveLength(2)
+    expect(geoJSON.features[0].id).toBe('崇明区')
+    expect(geoJSON.features[0].properties.category).toBe('district-count')
+    expect(geoJSON.features[0].properties.formattedNum).toBe('53,036')
+    expect(geoJSON.features[0].geometry.coordinates).toEqual([121.397516, 31.626946])
+    expect(geoJSON.features[1].geometry.coordinates).toEqual([121.544346, 31.221461])
+  })
+
+  test('dispatches district count render command with html marker and click event', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+    const clicked = []
+
+    const result = renderDistrictCountPoints(districtCountRecords, {
+      fitView: true,
+      onClick(payload) {
+        clicked.push(payload)
+      },
+      style: {
+        point: {
+          zIndex: 100
+        }
+      }
+    })
+
+    expect(result.layerId).toBe(DISTRICT_COUNT_LAYER_ID)
+    expect(result.geoJSON.features).toHaveLength(2)
+    expect(mapStore.commandQueue[0].type).toBe('layer:clear')
+    expect(mapStore.commandQueue[1].type).toBe('layer:render')
+    expect(mapStore.commandQueue[1].payload.layerId).toBe(DISTRICT_COUNT_LAYER_ID)
+    expect(mapStore.commandQueue[1].payload.style.point.renderer).toBe('html')
+    expect(mapStore.commandQueue[1].payload.style.point.zIndex).toBe(100)
+    expect(typeof mapStore.commandQueue[1].payload.events.click).toBe('function')
+    expect(mapStore.commandQueue[2].type).toBe('layer:fit-view')
+
+    mapStore.commandQueue[1].payload.events.click(result.geoJSON.features[0], {
+      featureId: '崇明区',
+      properties: result.geoJSON.features[0].properties,
+      lnglat: [121.397516, 31.626946]
+    })
+    expect(clicked[0].districtName).toBe('崇明区')
+    expect(clicked[0].num).toBe(53036)
+  })
+
+  test('converts POI records to cluster points and district count points', () => {
+    const poiGeoJSON = createPoiPointGeoJSON(poiBusinessRecords)
+    const districtGeoJSON = createDistrictCountGeoJSONFromPoiRecords(poiBusinessRecords)
+
+    expect(poiGeoJSON.features).toHaveLength(3)
+    expect(poiGeoJSON.features[0].id).toBe('863849')
+    expect(poiGeoJSON.features[0].properties.category).toBe('便利店')
+    expect(poiGeoJSON.features[2].geometry.coordinates).toEqual([121.397516, 31.626946])
+
+    expect(districtGeoJSON.features).toHaveLength(2)
+    expect(districtGeoJSON.features[0].properties.districtName).toBe('宝山区')
+    expect(districtGeoJSON.features[0].properties.num).toBe(2)
+    expect(districtGeoJSON.features[0].geometry.coordinates[0]).toBeCloseTo(121.495906, 6)
+    expect(districtGeoJSON.features[0].geometry.coordinates[1]).toBeCloseTo(31.371295, 6)
+    expect(districtGeoJSON.features[1].properties.districtName).toBe('崇明区')
+    expect(districtGeoJSON.features[1].properties.num).toBe(1)
+  })
+
+  test('switches between POI cluster and district count layers by zoom', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    const lowZoomResult = renderPoiClusterOrDistrictCount(poiBusinessRecords, {
+      zoom: 10,
+      switchZoom: 11
+    })
+
+    expect(lowZoomResult.mode).toBe('district-count')
+    expect(mapStore.commandQueue[0].type).toBe('layer:clear')
+    expect(mapStore.commandQueue[0].payload.layerId).toBe(BUSINESS_POI_CLUSTER_LAYER_ID)
+    expect(mapStore.commandQueue[1].type).toBe('layer:render')
+    expect(mapStore.commandQueue[1].payload.layerId).toBe(DISTRICT_COUNT_LAYER_ID)
+
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+    const highZoomResult = renderPoiClusterOrDistrictCount(poiBusinessRecords, {
+      zoom: 13,
+      switchZoom: 11
+    })
+
+    expect(highZoomResult.mode).toBe('cluster')
+    expect(mapStore.commandQueue[0].type).toBe('layer:clear')
+    expect(mapStore.commandQueue[0].payload.layerId).toBe(DISTRICT_COUNT_LAYER_ID)
+    expect(mapStore.commandQueue[1].type).toBe('layer:clear')
+    expect(mapStore.commandQueue[1].payload.layerId).toBe(BUSINESS_POI_CLUSTER_LAYER_ID)
+    expect(mapStore.commandQueue[2].type).toBe('cluster:render')
+    expect(mapStore.commandQueue[2].payload.layerId).toBe(BUSINESS_POI_CLUSTER_LAYER_ID)
+  })
+
+  test('zoom renderer only redraws when display mode changes', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    const renderer = createPoiClusterDistrictZoomRenderer(poiBusinessRecords, {
+      switchZoom: 11
+    })
+
+    expect(renderer.renderByZoom(13).mode).toBe('cluster')
+    expect(mapStore.commandQueue).toHaveLength(3)
+
+    expect(renderer.renderByZoom(14)).toEqual({
+      mode: 'cluster',
+      skipped: true
+    })
+    expect(mapStore.commandQueue).toHaveLength(3)
+
+    expect(renderer.renderByZoom(10).mode).toBe('district-count')
+    expect(mapStore.commandQueue[3].payload.layerId).toBe(BUSINESS_POI_CLUSTER_LAYER_ID)
+    expect(mapStore.commandQueue[4].payload.layerId).toBe(DISTRICT_COUNT_LAYER_ID)
   })
 })
 
@@ -605,7 +983,7 @@ describe('cluster layer helpers', () => {
     })
 
     const imageClusterMarker = FakeMarkerCluster.instances[FakeMarkerCluster.instances.length - 1].clusterMarker
-    expect(imageClusterMarker.content).toContain('img src="/cluster.svg"')
+    expect(imageClusterMarker.content).toContain('img src="http://localhost/cluster.svg"')
     expect(imageClusterMarker.content).toContain('<span>2+</span>')
   })
 })
@@ -645,6 +1023,44 @@ describe('map action command entry', () => {
     expect(mapStore.commandQueue[0].payload.param.LAYERS).toBe('demo:grid')
   })
 
+  test('dispatches vector tile render command as a separate layer entry', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    mapActions.renderVectorTileLayer({
+      layerId: 'avg-price-mvt',
+      url: 'http://localhost/tiles/[z]/[x]/[y].pbf',
+      visible: true,
+      styles: {
+        polygon: {
+          sourceLayer: 'avg_price_grid',
+          color: '#f97316'
+        }
+      }
+    })
+
+    expect(mapStore.commandQueue).toHaveLength(1)
+    expect(mapStore.commandQueue[0].type).toBe('vector-tile:render')
+    expect(mapStore.commandQueue[0].payload.layerId).toBe('avg-price-mvt')
+    expect(mapStore.commandQueue[0].payload.styles.polygon.sourceLayer).toBe('avg_price_grid')
+  })
+
+  test('dispatches mv_grid_thinning vector tile example with provided service url', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    const layerId = renderMvGridThinningVectorTileExample()
+
+    expect(layerId).toBe(MV_GRID_THINNING_LAYER_ID)
+    expect(mapStore.commandQueue).toHaveLength(1)
+    expect(mapStore.commandQueue[0].type).toBe('vector-tile:render')
+    expect(mapStore.commandQueue[0].payload.layerId).toBe(MV_GRID_THINNING_LAYER_ID)
+    expect(mapStore.commandQueue[0].payload.url).toBe(MV_GRID_THINNING_URL)
+    expect(mapStore.commandQueue[0].payload.styles.polygon.sourceLayer).toBe('mv_grid_thinning')
+    expect(typeof mapStore.commandQueue[0].payload.styles.polygon.color).toBe('string')
+    expect(mapStore.commandQueue[0].payload.styles.polygon.color).toBe('rgba(249, 115, 22, 0.68)')
+    expect(mapStore.commandQueue[0].payload.styles.polygon.color).not.toContain('getGridValue')
+    expect(mapStore.commandQueue[0].payload.eventOptions.click.featType).toBe('polygon')
+  })
+
   test('dispatches patch style command for map and Loca layers', () => {
     mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
     locaActions.clearHandledCommands(Number.POSITIVE_INFINITY)
@@ -677,6 +1093,51 @@ describe('map action command entry', () => {
 
     expect(mapStore.customMarkerResult).toBe(null)
     expect(mapStore.commandQueue[0].type).toBe('marker:start')
+  })
+
+  test('activates coordinate picker and stores picked coordinate result', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+    mapActions.setCoordinatePickResult({
+      coordinate: '121,31'
+    })
+
+    mapActions.activateCoordinatePicker()
+
+    expect(mapStore.activeTool).toBe('coordinate-picker')
+    expect(mapStore.coordinatePickResult).toBe(null)
+    expect(mapStore.commandQueue[0].type).toBe('coordinate-picker:start')
+
+    mapActions.setCoordinatePickResult({
+      position: [121.541016, 31.239651],
+      lng: 121.541016,
+      lat: 31.239651,
+      coordinate: '121.541016,31.239651',
+      timestamp: 100
+    })
+    expect(mapStore.coordinatePickResult.coordinate).toBe('121.541016,31.239651')
+
+    mapActions.clearCoordinatePickResult()
+    expect(mapStore.coordinatePickResult).toBe(null)
+  })
+
+  test('dispatches custom marker rename, save and delete commands', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    mapActions.updateCustomMarkerName('custom-001', '上海锚点')
+    mapActions.saveCustomMarker('custom-001')
+    mapActions.deleteCustomMarker('custom-001')
+
+    expect(mapStore.commandQueue.map((command) => command.type)).toEqual([
+      'marker:update-name',
+      'marker:save',
+      'marker:delete'
+    ])
+    expect(mapStore.commandQueue[0].payload).toEqual({
+      id: 'custom-001',
+      name: '上海锚点'
+    })
+    expect(mapStore.commandQueue[1].payload.id).toBe('custom-001')
+    expect(mapStore.commandQueue[2].payload.id).toBe('custom-001')
   })
 
   test('controller routes patch style command and syncs layer info', () => {
@@ -724,6 +1185,42 @@ describe('map action command entry', () => {
       }
     })
   })
+
+  test('controller prepares map tools before coordinate picking', () => {
+    const map = createFakeMap()
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setActiveTool() {}
+      }
+    })
+    const closedMouseTool = []
+    const clearedRuler = []
+    const customMarkerHandler = () => {}
+
+    controller.mouseTool = {
+      close(ifClear) {
+        closedMouseTool.push(ifClear)
+      }
+    }
+    controller.rangingTool = {
+      turnOff(ifClear) {
+        clearedRuler.push(ifClear)
+      }
+    }
+    controller.customMarkerHandler = customMarkerHandler
+    map.on('click', customMarkerHandler)
+
+    controller.handleCommand({
+      type: 'coordinate-picker:start'
+    })
+
+    expect(closedMouseTool).toEqual([false])
+    expect(clearedRuler).toEqual([true])
+    expect(map.handlers.click).toBeUndefined()
+    expect(controller.customMarkerHandler).toBe(null)
+  })
 })
 
 describe('WMS layer registry', () => {
@@ -741,7 +1238,8 @@ describe('WMS layer registry', () => {
       opacity: 0.8,
       zIndex: 70,
       param: {
-        LAYERS: 'demo:grid'
+        LAYERS: 'demo:grid',
+        viewparams: 'age:0|1|2;gender:0|1'
       }
     })
 
@@ -751,6 +1249,9 @@ describe('WMS layer registry', () => {
     expect(layer.getInfo().visible).toBe(true)
     expect(layer.getInfo().param.LAYERS).toBe('demo:grid')
     expect(layer.getInfo().param.FORMAT).toBe('image/png')
+    expect(FakeWMSLayer.instances[0].options.params.LAYERS).toBe('demo:grid')
+    expect(FakeWMSLayer.instances[0].options.params.viewparams).toBe('age:0|1|2;gender:0|1')
+    expect(FakeWMSLayer.instances[0].params.viewparams).toBe('age:0|1|2;gender:0|1')
 
     layer.hide()
     expect(FakeWMSLayer.instances[0].visible).toBe(false)
@@ -775,6 +1276,54 @@ describe('WMS layer registry', () => {
     layer.destroy()
     expect(map.removed).toContain(FakeWMSLayer.instances[0])
     expect(FakeWMSLayer.instances[0].destroyed).toBe(true)
+  })
+
+  test('accepts params alias before first WMS tile request', () => {
+    FakeWMSLayer.instances = []
+    const layer = createWMSLayer('geo-server-grid', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    layer.setData({
+      url: 'http://localhost/geoserver/demo/wms',
+      params: {
+        LAYERS: 'demo:avg_price_grid',
+        viewparams: 'age:0|1|2;gender:0|1'
+      }
+    })
+
+    expect(FakeWMSLayer.instances).toHaveLength(1)
+    expect(FakeWMSLayer.instances[0].options.params.LAYERS).toBe('demo:avg_price_grid')
+    expect(FakeWMSLayer.instances[0].options.params.viewparams).toBe('age:0|1|2;gender:0|1')
+    expect(FakeWMSLayer.instances[0].params.viewparams).toBe('age:0|1|2;gender:0|1')
+  })
+
+  test('ignores empty WMS option updates without reading visible from undefined', () => {
+    FakeWMSLayer.instances = []
+    const layer = createWMSLayer('geo-server-grid', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    expect(() => layer.setData()).not.toThrow()
+    expect(() => layer.setStyle(null)).not.toThrow()
+    expect(() => layer.patchStyle(undefined)).not.toThrow()
+    expect(FakeWMSLayer.instances).toHaveLength(0)
+
+    layer.setData({
+      url: 'http://localhost/geoserver/demo/wms',
+      visible: false,
+      param: {
+        LAYERS: 'demo:grid'
+      }
+    })
+    expect(FakeWMSLayer.instances).toHaveLength(1)
+    expect(layer.getInfo().visible).toBe(false)
+
+    expect(() => layer.patchStyle(null)).not.toThrow()
+    expect(layer.getInfo().visible).toBe(false)
+    expect(layer.getInfo().param.LAYERS).toBe('demo:grid')
   })
 
   test('controller renders WMS layer and syncs layer info', () => {
@@ -831,6 +1380,157 @@ describe('WMS layer registry', () => {
   })
 })
 
+describe('vector tile layer registry', () => {
+  test('creates MVT layer, binds events, patches style and visibility', () => {
+    FakeMapboxVectorTileLayer.instances = []
+    const map = createFakeMap()
+    const clickEvents = []
+    const layer = createVectorTileLayer('avg-price-mvt', {
+      AMap: createFakeAMap(),
+      map
+    })
+
+    layer.setData({
+      url: 'http://localhost/tiles/{z}/{x}/{y}.pbf',
+      visible: true,
+      opacity: 0.86,
+      zIndex: 62,
+      zooms: [8, 18],
+      dataZooms: [8, 14],
+      styles: {
+        polygon: {
+          sourceLayer: 'avg_price_grid',
+          color: '#f97316',
+          borderWidth: 0.5
+        }
+      },
+      events: {
+        click(features, event) {
+          clickEvents.push({ features, event })
+        }
+      },
+      eventOptions: {
+        click: {
+          featType: 'polygon',
+          buffer: 4
+        }
+      }
+    })
+
+    expect(FakeMapboxVectorTileLayer.instances).toHaveLength(1)
+    expect(map.added[0]).toBe(FakeMapboxVectorTileLayer.instances[0])
+    expect(layer.getInfo().type).toBe('vector-tile')
+    expect(layer.getInfo().visible).toBe(true)
+    expect(FakeMapboxVectorTileLayer.instances[0].options.url).toBe('http://localhost/tiles/[z]/[x]/[y].pbf')
+    expect(layer.getInfo().sourceLayers).toEqual(['avg_price_grid'])
+    expect(layer.getInfo().eventTypes).toEqual(['click'])
+    expect(FakeMapboxVectorTileLayer.instances[0].handlers.click.option).toEqual({
+      featType: 'polygon',
+      buffer: 4
+    })
+
+    FakeMapboxVectorTileLayer.instances[0].handlers.click.handler([{ id: 1 }], { type: 'click' })
+    expect(clickEvents[0].features).toEqual([{ id: 1 }])
+
+    layer.patchStyle({
+      opacity: 0.6,
+      polygon: {
+        borderColor: '#111827',
+        borderWidth: 1
+      }
+    })
+
+    expect(FakeMapboxVectorTileLayer.instances[0].opacity).toBe(0.6)
+    expect(FakeMapboxVectorTileLayer.instances[0].styles.polygon.color).toBe('#f97316')
+    expect(FakeMapboxVectorTileLayer.instances[0].styles.polygon.borderColor).toBe('#111827')
+    expect(FakeMapboxVectorTileLayer.instances[0].styles.polygon.borderWidth).toBe(1)
+
+    layer.hide()
+    expect(FakeMapboxVectorTileLayer.instances[0].visible).toBe(false)
+    expect(layer.getInfo().visible).toBe(false)
+
+    layer.show()
+    expect(FakeMapboxVectorTileLayer.instances[0].visible).toBe(true)
+
+    expect(layer.filterByRect([[0, 0], [1, 1]], 'polygon')).toEqual([
+      {
+        rect: [[0, 0], [1, 1]],
+        type: 'polygon'
+      }
+    ])
+
+    layer.destroy()
+    expect(map.removed).toContain(FakeMapboxVectorTileLayer.instances[0])
+    expect(FakeMapboxVectorTileLayer.instances[0].destroyed).toBe(true)
+  })
+
+  test('controller renders vector tile layer and keeps common layer commands working', () => {
+    FakeMapboxVectorTileLayer.instances = []
+    const synced = []
+    const removed = []
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map: createFakeMap(),
+      actions: {
+        setLayerInfo(layerId, info) {
+          synced.push({ layerId, info })
+        },
+        removeLayerInfo(layerId) {
+          removed.push(layerId)
+        }
+      }
+    })
+
+    controller.handleCommand({
+      type: 'vector-tile:render',
+      payload: {
+        layerId: 'avg-price-mvt',
+        url: 'http://localhost/tiles/[z]/[x]/[y].pbf',
+        styles: {
+          polygon: {
+            sourceLayer: 'avg_price_grid',
+            color: '#84cc16'
+          }
+        }
+      }
+    })
+
+    expect(synced[0].layerId).toBe('avg-price-mvt')
+    expect(synced[0].info.type).toBe('vector-tile')
+    expect(synced[0].info.url).toBe('http://localhost/tiles/[z]/[x]/[y].pbf')
+
+    controller.handleCommand({
+      type: 'layer:style:patch',
+      payload: {
+        layerId: 'avg-price-mvt',
+        stylePatch: {
+          polygon: {
+            borderWidth: 2
+          }
+        }
+      }
+    })
+    expect(synced[synced.length - 1].info.styleSnapshot.polygon.borderWidth).toBe(2)
+
+    controller.handleCommand({
+      type: 'layer:visible',
+      payload: {
+        layerId: 'avg-price-mvt',
+        visible: false
+      }
+    })
+    expect(synced[synced.length - 1].info.visible).toBe(false)
+
+    controller.handleCommand({
+      type: 'layer:clear',
+      payload: {
+        layerId: 'avg-price-mvt'
+      }
+    })
+    expect(removed).toEqual(['avg-price-mvt'])
+  })
+})
+
 describe('custom marker result', () => {
   test('stores clicked custom marker coordinates for business components', () => {
     const map = createFakeMap()
@@ -873,6 +1573,374 @@ describe('custom marker result', () => {
     expect(map.added[0].extData.position).toEqual([121.541016, 31.239651])
     expect(map.handlers.click).toBeUndefined()
     expect(activeTools).toEqual([''])
+  })
+
+  test('custom marker context menu renames, requests save and deletes marker', () => {
+    FakeContextMenu.instances = []
+    const previousPrompt = globalThis.prompt
+    globalThis.prompt = () => '上海锚点'
+    const map = createFakeMap()
+    const results = []
+    const saveRequests = []
+    let clearResultCount = 0
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setCustomMarkerResult(result) {
+          results.push(result)
+        },
+        clearCustomMarkerResult() {
+          clearResultCount += 1
+        },
+        setCustomMarkerSaveRequest(request) {
+          saveRequests.push(request)
+        },
+        setActiveTool() {},
+        setLayerInfo() {},
+        removeLayerInfo() {}
+      }
+    })
+    const originEvent = {
+      preventDefaultCalled: false,
+      stopPropagationCalled: false,
+      preventDefault() {
+        this.preventDefaultCalled = true
+      },
+      stopPropagation() {
+        this.stopPropagationCalled = true
+      }
+    }
+
+    try {
+      controller.startCustomMarker()
+      map.handlers.click({
+        lnglat: new FakeLngLat(121.541016, 31.239651)
+      })
+
+      const marker = map.added[0]
+      expect(marker.title).toBe('自定义锚点')
+      expect(marker.label.content).toBe('自定义锚点')
+      expect(typeof marker.handlers.rightclick).toBe('function')
+
+      marker.handlers.rightclick({
+        lnglat: new FakeLngLat(121.541016, 31.239651),
+        originEvent
+      })
+
+      expect(FakeContextMenu.instances).toHaveLength(1)
+      expect(FakeContextMenu.instances[0].opened.lnglat.toArray()).toEqual([121.541016, 31.239651])
+      expect(originEvent.preventDefaultCalled).toBe(true)
+      expect(originEvent.stopPropagationCalled).toBe(true)
+
+      const renameMenu = FakeContextMenu.instances[0]
+      renameMenu.items.find((item) => item.index === 0).handler()
+      expect(marker.title).toBe('上海锚点')
+      expect(marker.label.content).toBe('上海锚点')
+      expect(marker.getExtData().name).toBe('上海锚点')
+      expect(results[results.length - 1].name).toBe('上海锚点')
+      expect(renameMenu.closed).toBe(true)
+
+      marker.handlers.rightclick({
+        lnglat: new FakeLngLat(121.541016, 31.239651),
+        originEvent
+      })
+      expect(FakeContextMenu.instances).toHaveLength(2)
+      const saveMenu = FakeContextMenu.instances[1]
+      saveMenu.items.find((item) => item.index === 1).handler()
+      expect(saveRequests).toHaveLength(1)
+      expect(saveRequests[0].name).toBe('上海锚点')
+      expect(saveRequests[0].position).toEqual([121.541016, 31.239651])
+      expect(typeof saveRequests[0].requestedAt).toBe('number')
+      expect(saveMenu.closed).toBe(true)
+
+      marker.handlers.rightclick({
+        lnglat: new FakeLngLat(121.541016, 31.239651),
+        originEvent
+      })
+      expect(FakeContextMenu.instances).toHaveLength(3)
+      const deleteMenu = FakeContextMenu.instances[2]
+      deleteMenu.items.find((item) => item.index === 2).handler()
+      expect(map.removed).toContain(marker)
+      expect(clearResultCount).toBe(1)
+      expect(deleteMenu.closed).toBe(true)
+    } finally {
+      globalThis.prompt = previousPrompt
+    }
+  })
+})
+
+describe('draw overlay management', () => {
+  test('stores drawn overlay, exposes result and deletes it through actions', async () => {
+    const map = createFakeMap()
+    const results = []
+    const overlayInfos = []
+    const overlayActions = []
+    const activeTools = []
+    let clearResultCount = 0
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setDrawResult(result) {
+          results.push(result)
+        },
+        clearDrawResult() {
+          clearResultCount += 1
+        },
+        setDrawOverlayInfo(info) {
+          overlayInfos.push(info)
+        },
+        setDrawOverlayAction(action) {
+          overlayActions.push(action)
+        },
+        setActiveTool(tool) {
+          activeTools.push(tool)
+        },
+        setLayerInfo() {},
+        removeLayerInfo() {}
+      }
+    })
+    const overlay = new FakeVectorOverlay({
+      path: [
+        new FakeLngLat(121.1, 31.1),
+        new FakeLngLat(121.2, 31.1),
+        new FakeLngLat(121.2, 31.2)
+      ],
+      bounds: new FakeBounds(new FakeLngLat(121.1, 31.1), new FakeLngLat(121.2, 31.2))
+    })
+
+    controller.currentDrawShape = 'polygon'
+    controller.handleDrawComplete({
+      obj: overlay
+    })
+    await waitForTimers()
+
+    expect(results).toHaveLength(1)
+    expect(results[0].shape).toBe('polygon')
+    expect(results[0].geoJSON.geometry.type).toBe('Polygon')
+    expect(results[0].geoJSON.geometry.coordinates[0][0]).toEqual([121.1, 31.1])
+    expect(results[0].bounds.southWest).toEqual([121.1, 31.1])
+    expect(overlayInfos[0].overlayCount).toBe(1)
+    expect(overlayActions[0].type).toBe('create')
+    expect(overlayActions[0].id).toBe(results[0].id)
+    expect(overlayActions[0].result.geoJSON.geometry.type).toBe('Polygon')
+    expect(overlay.getExtData().type).toBe('draw-overlay')
+    expect(typeof overlay.handlers.rightclick).toBe('function')
+    expect(activeTools).toContain('')
+
+    controller.deleteDrawOverlay({
+      id: results[0].id
+    })
+
+    expect(map.removed).toContain(overlay)
+    expect(clearResultCount).toBe(1)
+    expect(overlayInfos[overlayInfos.length - 1]).toBe(null)
+    expect(overlayActions[1].type).toBe('delete')
+    expect(overlayActions[1].id).toBe(results[0].id)
+    expect(overlayActions[1].overlayCount).toBe(0)
+  })
+
+  test('starts and stops draw overlay editor and refreshes GeoJSON after edits', async () => {
+    FakeDrawEditor.instances = []
+    const map = createFakeMap()
+    const results = []
+    const overlayInfos = []
+    const overlayActions = []
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setDrawResult(result) {
+          results.push(result)
+        },
+        clearDrawResult() {},
+        setDrawOverlayInfo(info) {
+          overlayInfos.push(info)
+        },
+        setDrawOverlayAction(action) {
+          overlayActions.push(action)
+        },
+        setActiveTool() {},
+        setLayerInfo() {},
+        removeLayerInfo() {}
+      }
+    })
+    const overlay = new FakeVectorOverlay({
+      path: [
+        new FakeLngLat(121.1, 31.1),
+        new FakeLngLat(121.2, 31.1),
+        new FakeLngLat(121.2, 31.2)
+      ],
+      bounds: new FakeBounds(new FakeLngLat(121.1, 31.1), new FakeLngLat(121.2, 31.2))
+    })
+
+    controller.currentDrawShape = 'polygon'
+    controller.handleDrawComplete({
+      obj: overlay
+    })
+    await waitForTimers()
+
+    const drawId = results[0].id
+    controller.startEditDrawOverlay({
+      id: drawId
+    })
+
+    expect(FakeDrawEditor.instances).toHaveLength(1)
+    expect(FakeDrawEditor.instances[0].opened).toBe(true)
+    expect(overlayInfos[overlayInfos.length - 1].editing).toBe(true)
+    expect(overlayActions.map((action) => action.type)).toContain('edit-start')
+
+    FakeContextMenu.instances = []
+    overlay.handlers.rightclick({
+      lnglat: new FakeLngLat(121.2, 31.2),
+      originEvent: {
+        preventDefault() {},
+        stopPropagation() {}
+      }
+    })
+    expect(FakeContextMenu.instances).toHaveLength(1)
+    expect(FakeContextMenu.instances[0].items.map((item) => item.label)).toContain('完成编辑')
+    expect(FakeContextMenu.instances[0].items.map((item) => item.label)).not.toContain('编辑图形')
+
+    overlay.path = [
+      new FakeLngLat(121.3, 31.3),
+      new FakeLngLat(121.4, 31.3),
+      new FakeLngLat(121.4, 31.4)
+    ]
+    FakeDrawEditor.instances[0].emit('adjust')
+
+    expect(results[results.length - 1].geoJSON.geometry.coordinates[0][0]).toEqual([121.3, 31.3])
+    expect(overlayActions.map((action) => action.type)).toContain('update')
+
+    controller.stopEditDrawOverlay()
+    await waitForTimers()
+
+    expect(FakeDrawEditor.instances[0].closed).toBe(true)
+    expect(FakeDrawEditor.instances[0].destroyed).toBe(true)
+    expect(overlayInfos[overlayInfos.length - 1].editing).toBe(false)
+    expect(overlayActions[overlayActions.length - 1].type).toBe('edit-stop')
+    expect(overlayActions[overlayActions.length - 1].id).toBe(drawId)
+  })
+
+  test('emits clear action with all temporary draw overlay ids', async () => {
+    const map = createFakeMap()
+    const overlayActions = []
+    let clearResultCount = 0
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setDrawResult() {},
+        clearDrawResult() {
+          clearResultCount += 1
+        },
+        setDrawOverlayInfo() {},
+        setDrawOverlayAction(action) {
+          overlayActions.push(action)
+        },
+        setActiveTool() {},
+        setLayerInfo() {},
+        removeLayerInfo() {}
+      }
+    })
+    const polygon = new FakeVectorOverlay({
+      path: [
+        new FakeLngLat(121.1, 31.1),
+        new FakeLngLat(121.2, 31.1),
+        new FakeLngLat(121.2, 31.2)
+      ],
+      bounds: new FakeBounds(new FakeLngLat(121.1, 31.1), new FakeLngLat(121.2, 31.2))
+    })
+    const circle = new FakeVectorOverlay({
+      center: new FakeLngLat(121.5, 31.5),
+      radius: 800,
+      bounds: new FakeBounds(new FakeLngLat(121.49, 31.49), new FakeLngLat(121.51, 31.51))
+    })
+
+    controller.currentDrawShape = 'polygon'
+    controller.handleDrawComplete({
+      obj: polygon
+    })
+    controller.currentDrawShape = 'circle'
+    controller.handleDrawComplete({
+      obj: circle
+    })
+    await waitForTimers()
+
+    controller.clearDrawOverlays()
+
+    const clearAction = overlayActions[overlayActions.length - 1]
+    expect(clearAction.type).toBe('clear')
+    expect(clearAction.ids).toHaveLength(2)
+    expect(clearAction.records.map((record) => record.shape)).toEqual(['polygon', 'circle'])
+    expect(clearAction.overlayCount).toBe(0)
+    expect(clearResultCount).toBe(1)
+  })
+
+  test('opens draw overlay context menu and routes menu delete action', async () => {
+    FakeContextMenu.instances = []
+    const map = createFakeMap()
+    const results = []
+    let clearResultCount = 0
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setDrawResult(result) {
+          results.push(result)
+        },
+        clearDrawResult() {
+          clearResultCount += 1
+        },
+        setDrawOverlayInfo() {},
+        setActiveTool() {},
+        setLayerInfo() {},
+        removeLayerInfo() {}
+      }
+    })
+    const overlay = new FakeVectorOverlay({
+      center: new FakeLngLat(121.5, 31.5),
+      radius: 800,
+      bounds: new FakeBounds(new FakeLngLat(121.49, 31.49), new FakeLngLat(121.51, 31.51))
+    })
+    const originEvent = {
+      preventDefaultCalled: false,
+      stopPropagationCalled: false,
+      preventDefault() {
+        this.preventDefaultCalled = true
+      },
+      stopPropagation() {
+        this.stopPropagationCalled = true
+      }
+    }
+
+    controller.currentDrawShape = 'circle'
+    controller.handleDrawComplete({
+      obj: overlay
+    })
+    await waitForTimers()
+
+    overlay.handlers.rightclick({
+      lnglat: new FakeLngLat(121.5, 31.5),
+      originEvent
+    })
+
+    expect(FakeContextMenu.instances).toHaveLength(1)
+    const menu = FakeContextMenu.instances[0]
+    expect(menu.opened.lnglat.toArray()).toEqual([121.5, 31.5])
+    expect(originEvent.preventDefaultCalled).toBe(true)
+    expect(originEvent.stopPropagationCalled).toBe(true)
+    expect(menu.items.map((item) => item.label)).toContain('编辑图形')
+    expect(menu.items.map((item) => item.label)).not.toContain('完成编辑')
+    expect(menu.items.map((item) => item.label)).not.toContain('清空绘图')
+
+    const deleteItem = menu.items.find((item) => item.label === '删除图形')
+    deleteItem.handler()
+
+    expect(map.removed).toContain(overlay)
+    expect(clearResultCount).toBe(1)
+    expect(menu.closed).toBe(true)
   })
 })
 

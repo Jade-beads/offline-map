@@ -5,7 +5,8 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "test": "bun test"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "element-ui": "2.15.14",
@@ -14,6 +15,9 @@
   "devDependencies": {
     "@vue/cli-plugin-babel": "~5.0.8",
     "@vue/cli-service": "~5.0.8",
+    "babel-jest": "^30.4.1",
+    "jest": "^30.4.1",
+    "jest-environment-jsdom": "^30.4.1",
     "vue-template-compiler": "2.6.14"
   },
   "browserslist": [

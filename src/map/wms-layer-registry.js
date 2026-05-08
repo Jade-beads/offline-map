@@ -14,6 +14,10 @@ const DEFAULT_WMS_OPTIONS = {
   }
 }
 
+function isPlainObject(value) {
+  return Object.prototype.toString.call(value) === '[object Object]'
+}
+
 function getWMSConstructor(AMap) {
   return AMap &&
     AMap.TileLayer &&
@@ -73,13 +77,20 @@ function applyOptionSetters(layer, options = {}) {
 }
 
 function normalizeOptions(input = {}) {
+  const normalizedInput = isPlainObject(input) ? input : {}
   const {
     layerId,
     style,
+    params,
     ...rest
-  } = input || {}
+  } = normalizedInput
 
-  return mergeStyle(DEFAULT_WMS_OPTIONS, rest, style || {})
+  const nextOptions = mergeStyle(DEFAULT_WMS_OPTIONS, rest, style || {})
+  if (params) {
+    nextOptions.param = mergeStyle(nextOptions.param || {}, params)
+  }
+
+  return nextOptions
 }
 
 export function createWMSLayer(layerId, context) {
@@ -114,6 +125,7 @@ export function createWMSLayer(layerId, context) {
 
     return new WMSLayer({
       ...options,
+      params: options.param,
       visible
     })
   }
@@ -124,6 +136,7 @@ export function createWMSLayer(layerId, context) {
     layer = createLayerInstance()
     if (!layer) return null
 
+    applyOptionSetters(layer, options)
     addLayer(map, layer)
     added = true
 
@@ -135,8 +148,11 @@ export function createWMSLayer(layerId, context) {
   }
 
   function applyOptions(nextOptions) {
+    const resolvedOptions = isPlainObject(nextOptions)
+      ? nextOptions
+      : mergeStyle({}, options || DEFAULT_WMS_OPTIONS)
     const previousUrl = options.url
-    options = nextOptions
+    options = resolvedOptions
     visible = options.visible !== false
 
     if (!layer || previousUrl !== options.url) {
