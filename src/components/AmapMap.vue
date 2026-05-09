@@ -10,17 +10,9 @@
 <script>
 import { MapController } from '../map/map-controller'
 import { mapActions, mapStore } from '../map/map-store'
+import { toLngLatArray } from '../map/utils/coord'
 import { LocaController } from '../loca/loca-controller'
 import { locaActions, locaStore } from '../loca/loca-store'
-
-function toLngLatArray(lnglat) {
-  if (!lnglat) return null
-  if (typeof lnglat.toArray === 'function') return lnglat.toArray()
-  if (typeof lnglat.getLng === 'function' && typeof lnglat.getLat === 'function') {
-    return [lnglat.getLng(), lnglat.getLat()]
-  }
-  return Array.isArray(lnglat) ? lnglat : null
-}
 
 const SATELLITE_TILE_HOSTS = [
   'webst01.is.autonavi.com',

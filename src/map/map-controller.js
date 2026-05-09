@@ -2,6 +2,13 @@ import { createClusterLayer } from './cluster-layer-registry'
 import { createLayer } from './layer-registry'
 import { createVectorTileLayer } from './vector-tile-layer-registry'
 import { createWMSLayer } from './wms-layer-registry'
+import {
+  boundsToPlain,
+  getOverlayBounds,
+  toLngLatArray
+} from './utils/coord'
+import { getPromptInput, scheduleTask } from './utils/dom'
+import { createCustomMarkerContent, overlayToGeoJSON } from './utils/overlay'
 
 const DRAW_OPTIONS = {
   fillColor: '#5f97f0',
@@ -24,141 +31,6 @@ const DRAW_EDITOR_OPTIONS = {
 }
 
 const DRAW_EDITOR_EVENTS = ['end', 'adjust', 'move', 'addnode', 'removenode', 'change']
-
-function toLngLatArray(lnglat) {
-  if (!lnglat) return null
-  if (typeof lnglat.toArray === 'function') return lnglat.toArray()
-  if (typeof lnglat.getLng === 'function' && typeof lnglat.getLat === 'function') {
-    return [lnglat.getLng(), lnglat.getLat()]
-  }
-  return Array.isArray(lnglat) ? lnglat : null
-}
-
-function normalizePath(path) {
-  if (!Array.isArray(path)) return []
-
-  return path
-    .map(toLngLatArray)
-    .filter((position) => Array.isArray(position) && position.length >= 2)
-}
-
-function closeRing(path) {
-  if (!path.length) return path
-
-  const first = path[0]
-  const last = path[path.length - 1]
-  if (first[0] === last[0] && first[1] === last[1]) {
-    return path
-  }
-
-  return [...path, first]
-}
-
-function boundsToPlain(bounds) {
-  if (!bounds) return null
-
-  const southWest = typeof bounds.getSouthWest === 'function' ? toLngLatArray(bounds.getSouthWest()) : null
-  const northEast = typeof bounds.getNorthEast === 'function' ? toLngLatArray(bounds.getNorthEast()) : null
-
-  if (!southWest || !northEast) return null
-
-  return {
-    southWest,
-    northEast
-  }
-}
-
-function getOverlayBounds(overlay) {
-  if (!overlay || typeof overlay.getBounds !== 'function') return null
-
-  try {
-    return boundsToPlain(overlay.getBounds())
-  } catch (error) {
-    return null
-  }
-}
-
-function scheduleTask(callback, delay) {
-  const timerHost = typeof window !== 'undefined' && window.setTimeout
-    ? window
-    : globalThis
-
-  return timerHost.setTimeout(callback, delay)
-}
-
-function escapeHtml(value) {
-  return String(value == null ? '' : value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
-function createCustomMarkerContent(name) {
-  return `<div class="custom-map-marker" title="${escapeHtml(name)}"><span></span></div>`
-}
-
-function getPromptInput(message, defaultValue) {
-  const promptFn = typeof window !== 'undefined' && typeof window.prompt === 'function'
-    ? window.prompt.bind(window)
-    : (typeof globalThis.prompt === 'function' ? globalThis.prompt.bind(globalThis) : null)
-
-  return promptFn ? promptFn(message, defaultValue) : null
-}
-
-function getPathFromBounds(bounds) {
-  if (!bounds || !bounds.southWest || !bounds.northEast) return []
-
-  const [west, south] = bounds.southWest
-  const [east, north] = bounds.northEast
-
-  return [
-    [west, south],
-    [east, south],
-    [east, north],
-    [west, north],
-    [west, south]
-  ]
-}
-
-function overlayToGeoJSON(shape, overlay, bounds) {
-  if (!overlay) return null
-
-  if (shape === 'circle' && typeof overlay.getCenter === 'function') {
-    const center = toLngLatArray(overlay.getCenter())
-    const radius = typeof overlay.getRadius === 'function' ? overlay.getRadius() : undefined
-
-    return {
-      type: 'Feature',
-      properties: {
-        shape,
-        radius
-      },
-      geometry: {
-        type: 'Point',
-        coordinates: center
-      }
-    }
-  }
-
-  const path = typeof overlay.getPath === 'function'
-    ? closeRing(normalizePath(overlay.getPath()))
-    : getPathFromBounds(bounds)
-
-  if (!path.length) return null
-
-  return {
-    type: 'Feature',
-    properties: {
-      shape
-    },
-    geometry: {
-      type: 'Polygon',
-      coordinates: [path]
-    }
-  }
-}
 
 export class MapController {
   constructor({ AMap, map, actions }) {
