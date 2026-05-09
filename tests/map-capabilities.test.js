@@ -20,11 +20,44 @@ import { createVectorTileLayer } from '../src/map/vector-tile-layer-registry'
 import { createWMSLayer } from '../src/map/wms-layer-registry'
 import { createLocaLayer } from '../src/loca/loca-layer-registry'
 import { locaActions, locaStore } from '../src/loca/loca-store'
-import {
-  MV_GRID_THINNING_LAYER_ID,
-  MV_GRID_THINNING_URL,
-  renderMvGridThinningVectorTileExample
-} from '../src/examples/vector-tile-feature-examples'
+const MV_GRID_THINNING_LAYER_ID = 'mv-grid-thinning-vector-tile'
+const MV_GRID_THINNING_URL = 'http://192.168.100.109:3000/mv_grid_thinning/{z}/{x}/{y}.pbf'
+
+function renderMvGridThinningVectorTileExample(options = {}) {
+  const layerId = options.layerId || MV_GRID_THINNING_LAYER_ID
+  mapActions.renderVectorTileLayer({
+    layerId,
+    url: options.url || MV_GRID_THINNING_URL,
+    visible: options.visible !== false,
+    opacity: options.opacity == null ? 0.82 : options.opacity,
+    zIndex: options.zIndex == null ? 64 : options.zIndex,
+    zooms: options.zooms || [8, 18],
+    dataZooms: options.dataZooms || [8, 14],
+    tileSize: options.tileSize || 256,
+    styles: options.styles || {
+      polygon: {
+        sourceLayer: 'mv_grid_thinning',
+        color: 'rgba(249, 115, 22, 0.68)',
+        borderColor: 'rgba(255,255,255,0.65)',
+        borderWidth: 0.4,
+        visible: true
+      }
+    },
+    events: {
+      click(features, event) {
+        if (typeof options.onClick === 'function') options.onClick(features, event)
+      },
+      mousemove(features, event) {
+        if (typeof options.onMouseMove === 'function') options.onMouseMove(features, event)
+      }
+    },
+    eventOptions: {
+      click: { featType: 'polygon', buffer: 4 },
+      mousemove: { featType: 'polygon', buffer: 4 }
+    }
+  })
+  return layerId
+}
 
 const bankRecords = [
   {

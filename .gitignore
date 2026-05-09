@@ -6,3 +6,5 @@ dist/
 .idea/
 .claude/
 .chrome-functional-check/
+.chrome-mvt-runtime-check/
+coverage/
