@@ -51,7 +51,7 @@ export const mapStore = Vue.observable({
   customMarkerResult: null,
   customMarkerSaveRequest: null,
   viewport: {
-    center: [117.2272, 31.8206],
+    center: [121.4737, 31.2304],
     zoom: 11,
     bounds: null
   }
