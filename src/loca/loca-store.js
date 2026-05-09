@@ -11,6 +11,18 @@ function isPlainObject(value) {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
 
+function assertLayerId(layerId, method) {
+  if (!layerId) {
+    throw new Error(`locaActions.${method}: layerId 不能为空`)
+  }
+}
+
+function assertFeatureId(featureId, method) {
+  if (featureId == null) {
+    throw new Error(`locaActions.${method}: featureId 不能为空`)
+  }
+}
+
 function getRenderDefaultProperties(renderParams) {
   const properties = isPlainObject(renderParams.properties)
     ? { ...renderParams.properties }
@@ -46,7 +58,7 @@ export const locaActions = {
   },
 
   setLayerInfo(layerId, info = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'setLayerInfo')
 
     Vue.set(locaStore.layerRegistry, layerId, {
       layerId,
@@ -55,7 +67,7 @@ export const locaActions = {
   },
 
   removeLayerInfo(layerId) {
-    if (!layerId) return
+    assertLayerId(layerId, 'removeLayerInfo')
 
     Vue.delete(locaStore.layerRegistry, layerId)
   },
@@ -87,8 +99,7 @@ export const locaActions = {
       ? { layerId: params }
       : params || {}
     const layerId = renderParams.layerId
-
-    if (!layerId) return
+    assertLayerId(layerId, 'renderGeoJSONLayer')
 
     this.dispatchLocaCommand('loca:layer:render', {
       layerId,
@@ -102,7 +113,7 @@ export const locaActions = {
   },
 
   setLayerVisible(layerId, visible) {
-    if (!layerId) return
+    assertLayerId(layerId, 'setLayerVisible')
 
     this.dispatchLocaCommand('loca:layer:visible', {
       layerId,
@@ -111,7 +122,10 @@ export const locaActions = {
   },
 
   setLayerCategoryVisible(layerId, category, visible) {
-    if (!layerId || category == null) return
+    assertLayerId(layerId, 'setLayerCategoryVisible')
+    if (category == null) {
+      throw new Error('locaActions.setLayerCategoryVisible: category 不能为空')
+    }
 
     this.dispatchLocaCommand('loca:layer:category-visible', {
       layerId,
@@ -121,7 +135,7 @@ export const locaActions = {
   },
 
   setFeaturesVisible(layerId, featureIds, visible) {
-    if (!layerId) return
+    assertLayerId(layerId, 'setFeaturesVisible')
 
     this.dispatchLocaCommand('loca:layer:features-visible', {
       layerId,
@@ -131,7 +145,7 @@ export const locaActions = {
   },
 
   setLayerStyle(layerId, style = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'setLayerStyle')
 
     this.dispatchLocaCommand('loca:layer:style', {
       layerId,
@@ -140,7 +154,7 @@ export const locaActions = {
   },
 
   patchLayerStyle(layerId, stylePatch = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'patchLayerStyle')
 
     this.dispatchLocaCommand('loca:layer:style:patch', {
       layerId,
@@ -149,7 +163,8 @@ export const locaActions = {
   },
 
   setFeatureStyle(layerId, featureId, style = {}) {
-    if (!layerId || featureId == null) return
+    assertLayerId(layerId, 'setFeatureStyle')
+    assertFeatureId(featureId, 'setFeatureStyle')
 
     this.dispatchLocaCommand('loca:layer:feature-style', {
       layerId,
@@ -163,7 +178,8 @@ export const locaActions = {
   },
 
   clearFeatureStyle(layerId, featureId) {
-    if (!layerId || featureId == null) return
+    assertLayerId(layerId, 'clearFeatureStyle')
+    assertFeatureId(featureId, 'clearFeatureStyle')
 
     this.dispatchLocaCommand('loca:layer:feature-style:clear', {
       layerId,
@@ -172,7 +188,7 @@ export const locaActions = {
   },
 
   clearLayerFeatureStyles(layerId) {
-    if (!layerId) return
+    assertLayerId(layerId, 'clearLayerFeatureStyles')
 
     this.dispatchLocaCommand('loca:layer:feature-styles:clear', {
       layerId
@@ -180,7 +196,7 @@ export const locaActions = {
   },
 
   fitLayerView(layerId, options = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'fitLayerView')
 
     this.dispatchLocaCommand('loca:layer:fit-view', {
       layerId,
@@ -189,7 +205,7 @@ export const locaActions = {
   },
 
   clearLayer(layerId) {
-    if (!layerId) return
+    assertLayerId(layerId, 'clearLayer')
 
     this.dispatchLocaCommand('loca:layer:clear', {
       layerId

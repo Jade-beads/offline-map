@@ -27,6 +27,18 @@ function isPlainObject(value) {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
 
+function assertLayerId(layerId, method) {
+  if (!layerId) {
+    throw new Error(`mapActions.${method}: layerId 不能为空`)
+  }
+}
+
+function assertFeatureId(featureId, method) {
+  if (featureId == null) {
+    throw new Error(`mapActions.${method}: featureId 不能为空`)
+  }
+}
+
 function getRenderDefaultProperties(renderParams) {
   const properties = isPlainObject(renderParams.properties)
     ? { ...renderParams.properties }
@@ -126,7 +138,7 @@ export const mapActions = {
   },
 
   setLayerInfo(layerId, info = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'setLayerInfo')
 
     Vue.set(mapStore.layerRegistry, layerId, {
       layerId,
@@ -135,7 +147,7 @@ export const mapActions = {
   },
 
   removeLayerInfo(layerId) {
-    if (!layerId) return
+    assertLayerId(layerId, 'removeLayerInfo')
 
     Vue.delete(mapStore.layerRegistry, layerId)
   },
@@ -252,6 +264,8 @@ export const mapActions = {
   },
 
   setLayerVisible(layerId, visible) {
+    assertLayerId(layerId, 'setLayerVisible')
+
     this.dispatchMapCommand('layer:visible', {
       layerId,
       visible
@@ -259,7 +273,7 @@ export const mapActions = {
   },
 
   setLayerStyle(layerId, style = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'setLayerStyle')
 
     this.dispatchMapCommand('layer:style', {
       layerId,
@@ -268,7 +282,7 @@ export const mapActions = {
   },
 
   patchLayerStyle(layerId, stylePatch = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'patchLayerStyle')
 
     this.dispatchMapCommand('layer:style:patch', {
       layerId,
@@ -277,6 +291,8 @@ export const mapActions = {
   },
 
   setLayerCategoryVisible(layerId, category, visible) {
+    assertLayerId(layerId, 'setLayerCategoryVisible')
+
     this.dispatchMapCommand('layer:category-visible', {
       layerId,
       category,
@@ -285,7 +301,7 @@ export const mapActions = {
   },
 
   setFeaturesVisible(layerId, featureIds, visible) {
-    if (!layerId) return
+    assertLayerId(layerId, 'setFeaturesVisible')
 
     this.dispatchMapCommand('layer:features-visible', {
       layerId,
@@ -295,7 +311,7 @@ export const mapActions = {
   },
 
   clearLayer(layerId) {
-    if (!layerId) return
+    assertLayerId(layerId, 'clearLayer')
 
     this.dispatchMapCommand('layer:clear', {
       layerId
@@ -307,7 +323,9 @@ export const mapActions = {
   },
 
   clearLayerByPrefix(prefix) {
-    if (!prefix) return
+    if (!prefix) {
+      throw new Error('mapActions.clearLayerByPrefix: prefix 不能为空')
+    }
 
     this.dispatchMapCommand('layers:clear-by-prefix', {
       prefix
@@ -315,7 +333,8 @@ export const mapActions = {
   },
 
   setFeatureStyle(layerId, featureId, style = {}) {
-    if (!layerId || featureId == null) return
+    assertLayerId(layerId, 'setFeatureStyle')
+    assertFeatureId(featureId, 'setFeatureStyle')
 
     this.dispatchMapCommand('layer:feature-style', {
       layerId,
@@ -329,7 +348,8 @@ export const mapActions = {
   },
 
   clearFeatureStyle(layerId, featureId) {
-    if (!layerId || featureId == null) return
+    assertLayerId(layerId, 'clearFeatureStyle')
+    assertFeatureId(featureId, 'clearFeatureStyle')
 
     this.dispatchMapCommand('layer:feature-style:clear', {
       layerId,
@@ -338,7 +358,7 @@ export const mapActions = {
   },
 
   clearLayerFeatureStyles(layerId) {
-    if (!layerId) return
+    assertLayerId(layerId, 'clearLayerFeatureStyles')
 
     this.dispatchMapCommand('layer:feature-styles:clear', {
       layerId
@@ -346,7 +366,8 @@ export const mapActions = {
   },
 
   focusFeature(layerId, featureId) {
-    if (!layerId || featureId == null) return
+    assertLayerId(layerId, 'focusFeature')
+    assertFeatureId(featureId, 'focusFeature')
 
     this.dispatchMapCommand('layer:focus', {
       type: layerId,
@@ -355,7 +376,7 @@ export const mapActions = {
   },
 
   fitLayerView(layerId, options = {}) {
-    if (!layerId) return
+    assertLayerId(layerId, 'fitLayerView')
 
     this.dispatchMapCommand('layer:fit-view', {
       layerId,
@@ -368,10 +389,7 @@ export const mapActions = {
       ? { layerId: params }
       : params || {}
     const layerId = renderParams.layerId
-
-    if (!layerId) {
-      return
-    }
+    assertLayerId(layerId, 'renderGeoJSONLayer')
 
     this.dispatchMapCommand('layer:render', {
       layerId,
@@ -394,10 +412,7 @@ export const mapActions = {
       ? { layerId: params }
       : params || {}
     const layerId = renderParams.layerId
-
-    if (!layerId) {
-      return
-    }
+    assertLayerId(layerId, 'renderGeoJSONClusterLayer')
 
     this.dispatchMapCommand('cluster:render', {
       layerId,
@@ -418,10 +433,7 @@ export const mapActions = {
       ? { layerId: params }
       : params || {}
     const layerId = renderParams.layerId
-
-    if (!layerId) {
-      return
-    }
+    assertLayerId(layerId, 'renderWMSLayer')
 
     this.dispatchMapCommand('wms:render', {
       ...renderParams,
@@ -434,10 +446,7 @@ export const mapActions = {
       ? { layerId: params }
       : params || {}
     const layerId = renderParams.layerId
-
-    if (!layerId) {
-      return
-    }
+    assertLayerId(layerId, 'renderVectorTileLayer')
 
     this.dispatchMapCommand('vector-tile:render', {
       ...renderParams,

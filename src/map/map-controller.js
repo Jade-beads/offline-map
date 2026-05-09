@@ -261,8 +261,6 @@ export class MapController {
   }
 
   renderLayer(payload = {}) {
-    if (!payload.layerId) return
-
     const layerExists = this.layers.has(payload.layerId)
     const layer = this.getLayer(payload.layerId)
     layer.setData(payload.geoJSON, payload.style, {
@@ -286,8 +284,6 @@ export class MapController {
   }
 
   renderClusterLayer(payload = {}) {
-    if (!payload.layerId) return
-
     const layerExists = this.layers.has(payload.layerId)
     const layer = this.getClusterLayer(payload.layerId)
     layer.setData(payload.geoJSON, payload.style, {
@@ -309,8 +305,6 @@ export class MapController {
   }
 
   renderWMSLayer(payload = {}) {
-    if (!payload.layerId) return
-
     const layerExists = this.layers.has(payload.layerId)
     const layer = this.getWMSLayer(payload.layerId)
     layer.setData(payload)
@@ -329,8 +323,6 @@ export class MapController {
   }
 
   renderVectorTileLayer(payload = {}) {
-    if (!payload.layerId) return
-
     const layerExists = this.layers.has(payload.layerId)
     const layer = this.getVectorTileLayer(payload.layerId)
     layer.setData(payload)
@@ -349,8 +341,6 @@ export class MapController {
   }
 
   setLayerVisible(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer) return
 
@@ -364,8 +354,6 @@ export class MapController {
   }
 
   setLayerStyle(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.setStyle) return
 
@@ -374,8 +362,6 @@ export class MapController {
   }
 
   patchLayerStyle(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.patchStyle) return
 
@@ -384,8 +370,6 @@ export class MapController {
   }
 
   setLayerCategoryVisible(payload = {}) {
-    if (!payload.layerId || payload.category == null) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer) return
 
@@ -396,8 +380,6 @@ export class MapController {
   }
 
   setFeaturesVisible(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.setFeaturesVisible) return
 
@@ -406,8 +388,6 @@ export class MapController {
   }
 
   clearLayer(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer) return
 
@@ -425,8 +405,7 @@ export class MapController {
   }
 
   clearLayersByPrefix(payload = {}) {
-    const prefix = payload.prefix == null ? '' : String(payload.prefix)
-    if (!prefix) return
+    const prefix = String(payload.prefix)
 
     Array.from(this.layers.keys())
       .filter((layerId) => String(layerId).startsWith(prefix))
@@ -441,8 +420,6 @@ export class MapController {
   }
 
   setFeatureStyle(payload = {}) {
-    if (!payload.layerId || payload.featureId == null) return
-
     const layer = this.layers.get(payload.layerId)
     if (layer && layer.setFeatureStyle) {
       layer.setFeatureStyle(payload.featureId, payload.style)
@@ -451,8 +428,6 @@ export class MapController {
   }
 
   clearFeatureStyle(payload = {}) {
-    if (!payload.layerId || payload.featureId == null) return
-
     const layer = this.layers.get(payload.layerId)
     if (layer && layer.clearFeatureStyle) {
       layer.clearFeatureStyle(payload.featureId)
@@ -461,8 +436,6 @@ export class MapController {
   }
 
   clearLayerFeatureStyles(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (layer && layer.clearFeatureStyles) {
       layer.clearFeatureStyles()
@@ -471,8 +444,6 @@ export class MapController {
   }
 
   fitLayerView(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (layer && layer.fitView) {
       layer.fitView(payload.options)

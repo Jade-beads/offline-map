@@ -575,11 +575,11 @@ describe('map-store actions', () => {
     expect(mapActions.getLayerInfo('devices')).toBe(null)
   })
 
-  test('does not dispatch layer commands when required ids are missing', () => {
-    mapActions.setLayerStyle('', { point: { color: '#000000' } })
-    mapActions.renderGeoJSONLayer({}, { type: 'FeatureCollection', features: [] })
-    mapActions.setFeaturesVisible('', ['a'], false)
-    mapActions.focusFeature('devices', null)
+  test('throws when required ids are missing', () => {
+    expect(() => mapActions.setLayerStyle('', { point: { color: '#000000' } })).toThrow(/layerId/)
+    expect(() => mapActions.renderGeoJSONLayer({}, { type: 'FeatureCollection', features: [] })).toThrow(/layerId/)
+    expect(() => mapActions.setFeaturesVisible('', ['a'], false)).toThrow(/layerId/)
+    expect(() => mapActions.focusFeature('devices', null)).toThrow(/featureId/)
 
     expect(mapStore.commandQueue).toHaveLength(0)
   })

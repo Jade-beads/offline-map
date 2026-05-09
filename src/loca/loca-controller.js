@@ -39,8 +39,6 @@ export class LocaController {
   }
 
   renderLayer(payload = {}) {
-    if (!payload.layerId) return
-
     const layerExists = this.layers.has(payload.layerId)
     const layer = this.getLayer(payload.layerId, payload.type)
     layer.setData(payload.geoJSON, payload.style, {
@@ -63,8 +61,6 @@ export class LocaController {
   }
 
   setLayerVisible(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer) return
 
@@ -78,8 +74,6 @@ export class LocaController {
   }
 
   setLayerCategoryVisible(payload = {}) {
-    if (!payload.layerId || payload.category == null) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.setCategoryVisible) return
 
@@ -88,8 +82,6 @@ export class LocaController {
   }
 
   setFeaturesVisible(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.setFeaturesVisible) return
 
@@ -98,8 +90,6 @@ export class LocaController {
   }
 
   setLayerStyle(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.setStyle) return
 
@@ -108,8 +98,6 @@ export class LocaController {
   }
 
   patchLayerStyle(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.patchStyle) return
 
@@ -118,8 +106,6 @@ export class LocaController {
   }
 
   setFeatureStyle(payload = {}) {
-    if (!payload.layerId || payload.featureId == null) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.setFeatureStyle) return
 
@@ -128,8 +114,6 @@ export class LocaController {
   }
 
   clearFeatureStyle(payload = {}) {
-    if (!payload.layerId || payload.featureId == null) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.clearFeatureStyle) return
 
@@ -138,8 +122,6 @@ export class LocaController {
   }
 
   clearLayerFeatureStyles(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer || !layer.clearFeatureStyles) return
 
@@ -148,8 +130,6 @@ export class LocaController {
   }
 
   fitLayerView(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (layer && layer.fitView) {
       layer.fitView(payload.options)
@@ -157,8 +137,6 @@ export class LocaController {
   }
 
   clearLayer(payload = {}) {
-    if (!payload.layerId) return
-
     const layer = this.layers.get(payload.layerId)
     if (!layer) return
 
