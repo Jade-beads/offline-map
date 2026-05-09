@@ -1,4 +1,5 @@
 import { mapActions } from '../map/map-store'
+import { normalizeCoordinate } from './utils'
 
 export const BANK_POINT_LAYER_ID = 'business-bank-points'
 export const BANK_RADIUS_LAYER_ID = 'business-bank-radius'
@@ -26,20 +27,6 @@ const DEFAULT_ICON_MAP = {
   默认: createBankIconDataUri('银', '#64748b')
 }
 
-function normalizeCoordinate(record) {
-  const coordinates = record && record.geom && record.geom.coordinates
-  if (Array.isArray(coordinates) && coordinates.length >= 2) {
-    const lng = Number(coordinates[0])
-    const lat = Number(coordinates[1])
-    if (Number.isFinite(lng) && Number.isFinite(lat)) {
-      return [lng, lat]
-    }
-  }
-
-  const lng = Number(record && record.pointX)
-  const lat = Number(record && record.pointY)
-  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
-}
 
 function getBankType(record) {
   return record && record.level3Classification ? String(record.level3Classification) : '默认'

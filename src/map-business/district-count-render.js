@@ -1,28 +1,8 @@
 import { mapActions } from '../map/map-store'
+import { normalizeCoordinate } from './utils'
 
 export const DISTRICT_COUNT_LAYER_ID = 'business-district-count'
 export const BUSINESS_POI_CLUSTER_LAYER_ID = 'business-poi-cluster'
-
-function normalizeCoordinate(record) {
-  const geom = record && record.geom
-  const coordinates = Array.isArray(geom)
-    ? geom
-    : geom && Array.isArray(geom.coordinates)
-      ? geom.coordinates
-      : null
-
-  if (Array.isArray(coordinates) && coordinates.length >= 2) {
-    const lng = Number(coordinates[0])
-    const lat = Number(coordinates[1])
-    if (Number.isFinite(lng) && Number.isFinite(lat)) {
-      return [lng, lat]
-    }
-  }
-
-  const pointX = Number(record && record.pointX)
-  const pointY = Number(record && record.pointY)
-  return Number.isFinite(pointX) && Number.isFinite(pointY) ? [pointX, pointY] : null
-}
 
 function getDistrictId(record, index) {
   if (record && record.id != null) return String(record.id)
@@ -342,22 +322,6 @@ export function renderPoiClusterLayer(records = [], options = {}) {
       maxZoom: 16,
       minClusterSize: 2,
       averageCenter: true,
-      point: {
-        renderer: 'pin',
-        color: '#1677ff',
-        size: [30, 30],
-        textField: 'showTag',
-        textLength: 1,
-        zIndex: 90
-      },
-      cluster: {
-        renderer: 'html',
-        size: [58, 58],
-        color: '#1677ff',
-        textColor: '#ffffff',
-        html: createPoiClusterHtml,
-        zIndex: 130
-      },
       ...style,
       point: {
         renderer: 'pin',
@@ -442,12 +406,6 @@ export function renderPoiClusterOrDistrictCount(records = [], options = {}) {
       layerId: districtLayerId,
       visible: true,
       style: {
-        point: {
-          renderer: 'html',
-          size: [64, 64],
-          html: createCountMarkerHtml,
-          zIndex: 90
-        },
         ...(districtOptions.style || {}),
         point: {
           renderer: 'html',
