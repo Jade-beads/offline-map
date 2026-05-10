@@ -32,8 +32,7 @@ const MAP_OPTIONS = {
 }
 
 function createSatelliteLayer(AMap) {
-  if (!AMap || typeof AMap.TileLayer !== 'function') return null
-
+  // AMap.TileLayer.Satellite 是 TileLayer 的子类，离线包不一定打包
   const LayerConstructor = typeof AMap.TileLayer.Satellite === 'function' ? AMap.TileLayer.Satellite : AMap.TileLayer
   const layer = new LayerConstructor({
     tileUrl: SATELLITE_TILE_TEMPLATE,
@@ -43,10 +42,7 @@ function createSatelliteLayer(AMap) {
     dataZooms: [3, 18]
   })
 
-  if (typeof layer.setTileUrl === 'function') {
-    layer.setTileUrl(SATELLITE_TILE_TEMPLATE)
-  }
-
+  layer.setTileUrl(SATELLITE_TILE_TEMPLATE)
   return layer
 }
 
@@ -56,63 +52,18 @@ function getSatelliteTileUrl(x, y, z) {
 }
 
 function patchAmapOfflineRuntime(AMap) {
-  const config = typeof AMap.getConfig === 'function' ? AMap.getConfig() : null
-  if (config) {
-    config.tileVersion = config.tileVersion || 'offline'
-    config.styleVersion = config.styleVersion || 'offline'
-    config.iconVersion = config.iconVersion || 'offline'
-  }
-
-  const MapConstructor = AMap && AMap.Map
-  const prototype = MapConstructor && MapConstructor.prototype
-  if (!prototype) return
+  const config = AMap.getConfig()
+  config.tileVersion = config.tileVersion || 'offline'
+  config.styleVersion = config.styleVersion || 'offline'
+  config.iconVersion = config.iconVersion || 'offline'
 
   // plugin.js expects this API, but the current offline AMap3.js build does not expose it.
+  const prototype = AMap.Map.prototype
   if (typeof prototype.getOutseaState !== 'function') {
     prototype.getOutseaState = function getOutseaState() {
       return this.YG
     }
   }
-}
-
-function observeMapComplete(map, timeout = 8000) {
-  if (!map || typeof map.on !== 'function') return () => {}
-
-  let settled = false
-  let timer = null
-
-  const cleanup = () => {
-    if (timer) {
-      window.clearTimeout(timer)
-      timer = null
-    }
-
-    if (typeof map.off === 'function') {
-      map.off('complete', handleComplete)
-    }
-  }
-
-  const finish = (completed) => {
-    if (settled) return
-
-    settled = true
-    cleanup()
-
-    if (!completed) {
-      console.warn('[AmapMap] Map complete event timed out; tools are already initialized.')
-    }
-  }
-
-  const handleComplete = () => {
-    finish(true)
-  }
-
-  map.on('complete', handleComplete)
-  timer = window.setTimeout(() => {
-    finish(false)
-  }, timeout)
-
-  return cleanup
 }
 
 export default {
@@ -124,7 +75,6 @@ export default {
       map: null,
       controller: null,
       locaController: null,
-      cleanupMapCompleteObserver: null,
       moveEndHandler: null,
       zoomEndHandler: null,
       coordinatePickHandler: null,
@@ -153,55 +103,21 @@ export default {
   },
   mounted() {
     try {
-      const AMap = window.AMap
-      if (!AMap || typeof AMap.Map !== 'function') {
-        throw new Error('window.AMap is missing. Please check public/amap/AMap3.js.')
-      }
-
-      patchAmapOfflineRuntime(AMap)
-      const satelliteLayer = createSatelliteLayer(AMap)
-      const map = new AMap.Map(this.$refs.container, {
-        ...MAP_OPTIONS,
-        layers: satelliteLayer ? [satelliteLayer] : [],
-        zoom: this.store.viewport.zoom,
-        center: this.store.viewport.center
-      })
-      if (typeof map.setStatus === 'function') {
-        map.setStatus({
-          jogEnable: false,
-          animateEnable: false
-        })
-      }
-
-      this.map = map
+      const AMap = this.requireAMap()
+      const map = this.createMapInstance(AMap)
       this.bindMapEvents(map)
-      this.cleanupMapCompleteObserver = observeMapComplete(map)
-
-      this.controller = new MapController({
-        AMap,
-        map,
-        actions: mapActions
-      })
-
-      this.setupLocaController(AMap, map)
+      this.setupControllers(AMap, map)
       this.drainCommandQueue()
       if (this.store.activeTool === 'coordinate-picker') {
         this.bindCoordinatePicker()
       }
     } catch (error) {
-      const message = error && error.message ? error.message : '请检查 public/amap 离线资源包。'
-      this.errorMessage = `高德地图加载失败：${message}`
-      console.error(error)
+      this.handleInitError(error)
     } finally {
       this.loading = false
     }
   },
   beforeDestroy() {
-    if (this.cleanupMapCompleteObserver) {
-      this.cleanupMapCompleteObserver()
-      this.cleanupMapCompleteObserver = null
-    }
-
     this.clearMapEvents()
     this.clearCoordinatePicker()
     this.clearCoordinateCopyTip()
@@ -221,27 +137,58 @@ export default {
     }
   },
   methods: {
-    bindMapEvents(map) {
-      if (!map || typeof map.on !== 'function') return
+    requireAMap() {
+      const AMap = window.AMap
+      if (!AMap) {
+        throw new Error('window.AMap is missing. Please check public/amap/AMap3.js.')
+      }
+      return AMap
+    },
+    createMapInstance(AMap) {
+      patchAmapOfflineRuntime(AMap)
 
+      const satelliteLayer = createSatelliteLayer(AMap)
+      const map = new AMap.Map(this.$refs.container, {
+        ...MAP_OPTIONS,
+        layers: satelliteLayer ? [satelliteLayer] : [],
+        zoom: this.store.viewport.zoom,
+        center: this.store.viewport.center
+      })
+      map.setStatus({
+        jogEnable: false,
+        animateEnable: false
+      })
+
+      this.map = map
+      return map
+    },
+    setupControllers(AMap, map) {
+      this.controller = new MapController({ AMap, map, actions: mapActions })
+      this.setupLocaController(AMap, map)
+    },
+    handleInitError(error) {
+      const message = error && error.message ? error.message : '请检查 public/amap 离线资源包。'
+      this.errorMessage = `高德地图加载失败：${message}`
+      console.error(error)
+    },
+    bindMapEvents(map) {
       this.moveEndHandler = () => {
         mapActions.setViewport({
-          center: typeof map.getCenter === 'function' ? toLngLatArray(map.getCenter()) : null,
-          bounds: typeof map.getBounds === 'function' ? map.getBounds() : null
+          center: toLngLatArray(map.getCenter()),
+          bounds: map.getBounds()
         })
       }
 
       this.zoomEndHandler = () => {
-        mapActions.setViewport({
-          zoom: typeof map.getZoom === 'function' ? map.getZoom() : this.store.viewport.zoom
-        })
+        mapActions.setViewport({ zoom: map.getZoom() })
       }
 
       map.on('moveend', this.moveEndHandler)
       map.on('zoomend', this.zoomEndHandler)
     },
     clearMapEvents() {
-      if (!this.map || typeof this.map.off !== 'function') return
+      // beforeDestroy 时 this.map 可能已被销毁，仍需检查
+      if (!this.map) return
 
       if (this.moveEndHandler) {
         this.map.off('moveend', this.moveEndHandler)
@@ -256,8 +203,6 @@ export default {
       this.clearCoordinatePicker()
     },
     bindCoordinatePicker() {
-      if (!this.map || typeof this.map.on !== 'function') return
-
       this.clearCoordinatePicker()
       this.coordinatePickHandler = (event) => {
         const lnglat = toLngLatArray(event && event.lnglat)
@@ -283,7 +228,8 @@ export default {
       this.map.on('click', this.coordinatePickHandler)
     },
     clearCoordinatePicker() {
-      if (!this.map || !this.coordinatePickHandler || typeof this.map.off !== 'function') {
+      // beforeDestroy 时 this.map 可能已被销毁
+      if (!this.map || !this.coordinatePickHandler) {
         this.coordinatePickHandler = null
         return
       }
