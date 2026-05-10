@@ -10,6 +10,33 @@ import {
   resolveFeatureStyle,
   resolveHeatmapStyle
 } from './style-resolver'
+import {
+  applyOverlayVisibility,
+  createFeatureExtData,
+  getFeatures,
+  getFeatureStyleKey,
+  getOverlayCategory,
+  getOverlayFeatureKey,
+  getScopedStyleOverride,
+  hasFeatureStyle,
+  isPlainObject,
+  pickDefined,
+  resolveAssetUrl,
+  updateHiddenCategories,
+  updateHiddenFeatureIds
+} from './utils/feature'
+import {
+  createPixel,
+  createSize,
+  getLinePath,
+  getPointPositions,
+  getPolygonPath,
+  normalizeLine,
+  normalizePair,
+  normalizePolygon,
+  normalizePosition,
+  toNumber
+} from './utils/geometry'
 
 const MARKER_OPTION_KEYS = [
   'anchor',
@@ -89,284 +116,7 @@ const HEATMAP_OPTION_KEYS = [
   '3d'
 ]
 
-const GEOMETRY_TYPES = [
-  'Point',
-  'MultiPoint',
-  'LineString',
-  'MultiLineString',
-  'Polygon',
-  'MultiPolygon'
-]
-
-const GEOMETRY_STYLE_KEYS = ['point', 'line', 'polygon', 'heatmap']
-
 const OVERLAY_EVENT_TYPES = ['click', 'mouseover', 'mouseout']
-
-function isPlainObject(value) {
-  return Object.prototype.toString.call(value) === '[object Object]'
-}
-
-function isGeometry(geoJSON) {
-  return Boolean(geoJSON && GEOMETRY_TYPES.includes(geoJSON.type))
-}
-
-function normalizeProperties(defaultProperties, properties) {
-  return {
-    ...(defaultProperties || {}),
-    ...(properties || {})
-  }
-}
-
-function normalizeGeometryFeature(geometry, index = 0, defaultProperties = {}) {
-  const properties = normalizeProperties(defaultProperties, geometry.properties)
-
-  return {
-    type: 'Feature',
-    id: geometry.id || properties.id || `geometry-${index}`,
-    properties,
-    geometry
-  }
-}
-
-function normalizeFeature(feature, index = 0, defaultProperties = {}) {
-  if (!feature) return null
-
-  if (feature.type === 'Feature') {
-    const properties = normalizeProperties(defaultProperties, feature.properties)
-
-    return {
-      ...feature,
-      id: feature.id || properties.id || `feature-${index}`,
-      properties
-    }
-  }
-
-  if (isGeometry(feature)) {
-    return normalizeGeometryFeature(feature, index, defaultProperties)
-  }
-
-  return null
-}
-
-function getFeatures(geoJSON, defaultProperties = {}) {
-  if (!geoJSON) {
-    return []
-  }
-
-  if (geoJSON.type === 'FeatureCollection' && Array.isArray(geoJSON.features)) {
-    return geoJSON.features
-      .map((feature, index) => normalizeFeature(feature, index, defaultProperties))
-      .filter(Boolean)
-  }
-
-  if (geoJSON.type === 'Feature' || isGeometry(geoJSON)) {
-    return [normalizeFeature(geoJSON, 0, defaultProperties)].filter(Boolean)
-  }
-
-  if (Array.isArray(geoJSON)) {
-    return geoJSON
-      .map((feature, index) => normalizeFeature(feature, index, defaultProperties))
-      .filter(Boolean)
-  }
-
-  return []
-}
-
-function pickDefined(source, keys) {
-  return keys.reduce((result, key) => {
-    if (source && source[key] !== undefined) {
-      result[key] = source[key]
-    }
-    return result
-  }, {})
-}
-
-function toNumber(value, fallback) {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
-
-function normalizePair(value, fallback) {
-  if (Array.isArray(value) && value.length >= 2) {
-    return [toNumber(value[0], fallback[0]), toNumber(value[1], fallback[1])]
-  }
-
-  if (typeof value === 'number') {
-    return [value, value]
-  }
-
-  return fallback
-}
-
-function createPixel(AMap, value) {
-  if (!Array.isArray(value) || value.length < 2) return undefined
-
-  const pixel = [toNumber(value[0], 0), toNumber(value[1], 0)]
-  return typeof AMap.Pixel === 'function'
-    ? new AMap.Pixel(pixel[0], pixel[1])
-    : pixel
-}
-
-function createSize(AMap, value) {
-  const size = normalizePair(value, [28, 28])
-  return typeof AMap.Size === 'function'
-    ? new AMap.Size(size[0], size[1])
-    : size
-}
-
-function normalizePosition(coordinates) {
-  if (!Array.isArray(coordinates) || coordinates.length < 2) return null
-
-  const lng = Number(coordinates[0])
-  const lat = Number(coordinates[1])
-  return Number.isFinite(lng) && Number.isFinite(lat) ? [lng, lat] : null
-}
-
-function normalizeLine(coordinates) {
-  if (!Array.isArray(coordinates)) return []
-
-  return coordinates
-    .map(normalizePosition)
-    .filter(Boolean)
-}
-
-function normalizePolygon(coordinates) {
-  if (!Array.isArray(coordinates)) return []
-
-  return coordinates
-    .map(normalizeLine)
-    .filter((ring) => ring.length >= 3)
-}
-
-function getPointPositions(feature) {
-  const geometry = feature && feature.geometry
-  if (!geometry) return []
-
-  if (geometry.type === 'Point') {
-    const position = normalizePosition(geometry.coordinates)
-    return position ? [position] : []
-  }
-
-  if (geometry.type === 'MultiPoint') {
-    return Array.isArray(geometry.coordinates)
-      ? geometry.coordinates.map(normalizePosition).filter(Boolean)
-      : []
-  }
-
-  return []
-}
-
-function getLinePath(feature) {
-  const geometry = feature && feature.geometry
-  if (!geometry) return null
-
-  if (geometry.type === 'LineString') {
-    const path = normalizeLine(geometry.coordinates)
-    return path.length >= 2 ? path : null
-  }
-
-  if (geometry.type === 'MultiLineString') {
-    const path = Array.isArray(geometry.coordinates)
-      ? geometry.coordinates.map(normalizeLine).filter((line) => line.length >= 2)
-      : []
-    return path.length ? path : null
-  }
-
-  return null
-}
-
-function getPolygonPath(feature) {
-  const geometry = feature && feature.geometry
-  if (!geometry) return null
-
-  if (geometry.type === 'Polygon') {
-    const path = normalizePolygon(geometry.coordinates)
-    return path.length ? path : null
-  }
-
-  if (geometry.type === 'MultiPolygon') {
-    const path = Array.isArray(geometry.coordinates)
-      ? geometry.coordinates.map(normalizePolygon).filter((polygon) => polygon.length)
-      : []
-    return path.length ? path : null
-  }
-
-  return null
-}
-
-function createFeatureExtData(feature, extra = {}) {
-  return {
-    ...getFeatureProperties(feature),
-    ...extra,
-    id: getFeatureId(feature),
-    category: getFeatureCategory(feature),
-    feature
-  }
-}
-
-function getOverlayCategory(overlay) {
-  const extData = overlay.getExtData && overlay.getExtData()
-  if (!extData || extData.category == null) {
-    return null
-  }
-
-  return String(extData.category)
-}
-
-function normalizeCategories(category) {
-  return (Array.isArray(category) ? category : [category])
-    .filter((item) => item != null)
-    .map((item) => String(item))
-}
-
-function updateHiddenCategories(hiddenCategories, category, visible) {
-  normalizeCategories(category).forEach((item) => {
-    if (visible) {
-      hiddenCategories.delete(item)
-    } else {
-      hiddenCategories.add(item)
-    }
-  })
-}
-
-function normalizeFeatureIds(featureIds) {
-  return (Array.isArray(featureIds) ? featureIds : [featureIds])
-    .filter((item) => item != null)
-    .map((item) => String(item))
-}
-
-function updateHiddenFeatureIds(hiddenFeatureIds, featureIds, visible) {
-  normalizeFeatureIds(featureIds).forEach((item) => {
-    if (visible) {
-      hiddenFeatureIds.delete(item)
-    } else {
-      hiddenFeatureIds.add(item)
-    }
-  })
-}
-
-function shouldShowOverlay(overlay, visible, hiddenCategories, hiddenFeatureIds) {
-  const category = getOverlayCategory(overlay)
-  return visible &&
-    !hiddenFeatureIds.has(getOverlayFeatureKey(overlay)) &&
-    (category == null || !hiddenCategories.has(category))
-}
-
-function applyOverlayVisibility(overlays, visible, hiddenCategories, hiddenFeatureIds) {
-  overlays.forEach((overlay) => {
-    if (shouldShowOverlay(overlay, visible, hiddenCategories, hiddenFeatureIds)) {
-      overlay.show()
-    } else {
-      overlay.hide()
-    }
-  })
-}
-
-function resolveAssetUrl(src) {
-  if (!src) return ''
-
-  return new URL(String(src), window.location.origin).toString()
-}
 
 function createMarkerLabel(AMap, style, feature) {
   const label = style.label
@@ -607,29 +357,6 @@ function createOverlay(AMap, feature, style) {
   if (kind === 'polygon') return [createPolygonOverlay(AMap, feature, style)].filter(Boolean)
 
   return []
-}
-
-function getScopedStyleOverride(style, kind) {
-  if (!isPlainObject(style)) return {}
-  if (GEOMETRY_STYLE_KEYS.some((key) => style[key] != null)) {
-    return style[kind] || {}
-  }
-  return style
-}
-
-function getFeatureStyleKey(feature) {
-  const id = getFeatureId(feature)
-  return id == null ? '' : String(id)
-}
-
-function getOverlayFeatureKey(overlay) {
-  const extData = overlay.getExtData && overlay.getExtData()
-  const id = extData && extData.id
-  return id == null ? '' : String(id)
-}
-
-function hasFeatureStyle(style) {
-  return isPlainObject(style) && Object.keys(style).length > 0
 }
 
 function getHeatmapConstructor(AMap) {
