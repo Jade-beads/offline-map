@@ -56,6 +56,20 @@ export function getOverlayBounds(overlay) {
   }
 }
 
+export function normalizeEventPixel(pixel) {
+  if (!pixel) return null
+  if (Array.isArray(pixel)) return pixel
+
+  const x = pixel.x != null
+    ? pixel.x
+    : (typeof pixel.getX === 'function' ? pixel.getX() : undefined)
+  const y = pixel.y != null
+    ? pixel.y
+    : (typeof pixel.getY === 'function' ? pixel.getY() : undefined)
+
+  return x == null || y == null ? null : [x, y]
+}
+
 export function getPathFromBounds(bounds) {
   if (!bounds || !bounds.southWest || !bounds.northEast) return []
 

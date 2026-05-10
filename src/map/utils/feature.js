@@ -7,7 +7,9 @@
 import {
   getFeatureCategory,
   getFeatureId,
-  getFeatureProperties
+  getFeatureName,
+  getFeatureProperties,
+  getGeometryKind
 } from '../style-resolver'
 
 const GEOMETRY_TYPES = [
@@ -195,4 +197,30 @@ export function applyOverlayVisibility(overlays, visible, hiddenCategories, hidd
       overlay.hide()
     }
   })
+}
+
+export function getVisibleFeatures(features, hiddenCategories, hiddenFeatureIds) {
+  return features.filter((feature) => {
+    if (hiddenFeatureIds.has(getFeatureStyleKey(feature))) return false
+
+    const category = getFeatureCategory(feature)
+    return category == null || !hiddenCategories.has(category)
+  })
+}
+
+export function createFeatureIndex(features) {
+  return features.reduce((result, feature) => {
+    const key = getFeatureStyleKey(feature)
+    if (!key) return result
+
+    result[key] = {
+      id: getFeatureId(feature),
+      name: getFeatureName(feature),
+      category: getFeatureCategory(feature),
+      geometryKind: getGeometryKind(feature),
+      properties: getFeatureProperties(feature)
+    }
+
+    return result
+  }, {})
 }
