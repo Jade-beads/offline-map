@@ -71,6 +71,8 @@ All business data must be converted to GeoJSON `FeatureCollection` before being 
 - `public/amap/Loca.js` — Mass visualization library (telemetry disabled)
 - AMap is available globally as `window.AMap` and `window.Loca` — no dynamic loader
 
+**Available classes are documented in [`docs/amap-available-classes.md`](docs/amap-available-classes.md)** — the truth is "what's on `window.AMap` at runtime", not "what AMap v2 documents". Anything in that list is guaranteed present; **do not write capability guards** like `if (typeof AMap.MouseTool === 'function')` — just call it. If it's not in the list (e.g. `AMap.Driving`), it's not bundled and calling it will throw.
+
 ## Testing
 
 Tests live in `test/` (Jest unit tests) and `tests/` (bun:test-format capability tests, shimmed to run under Jest via `test/jest-bun-test-shim.js`).
@@ -86,5 +88,6 @@ Detailed API specs and protocols are in [`docs/`](docs/):
 - [`loca-mass-data-layer.md`](docs/loca-mass-data-layer.md) — Loca pipeline
 - [`map-vector-tile-layer.md`](docs/map-vector-tile-layer.md) — Vector tile layers
 - [`project-architecture.md`](docs/project-architecture.md) — Architecture overview
+- [`amap-available-classes.md`](docs/amap-available-classes.md) — Classes/namespaces actually exposed on `window.AMap` by the offline bundle
 
 Example integrations are in [`src/examples/`](src/examples/). They are imported by [`src/components/MapWorkspace.vue`](src/components/MapWorkspace.vue) (the in-repo dev demo shell) — do not delete them while MapWorkspace still depends on them. Examples are dev-only and should not be carried into the offline business project.
