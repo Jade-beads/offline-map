@@ -23,6 +23,84 @@ const GEOMETRY_TYPES = [
 
 const GEOMETRY_STYLE_KEYS = ['point', 'line', 'polygon', 'heatmap']
 
+export const MARKER_OPTION_KEYS = [
+  'anchor',
+  'angle',
+  'bubble',
+  'clickable',
+  'cursor',
+  'draggable',
+  'topWhenClick',
+  'visible',
+  'zIndex',
+  'zooms'
+]
+
+export const CIRCLE_OPTION_KEYS = [
+  'bubble',
+  'cursor',
+  'draggable',
+  'fillColor',
+  'fillOpacity',
+  'strokeColor',
+  'strokeDasharray',
+  'strokeOpacity',
+  'strokeStyle',
+  'strokeWeight',
+  'visible',
+  'zIndex',
+  'zooms'
+]
+
+export const LINE_OPTION_KEYS = [
+  'borderWeight',
+  'bubble',
+  'cursor',
+  'geodesic',
+  'isOutline',
+  'lineCap',
+  'lineJoin',
+  'outlineColor',
+  'showDir',
+  'strokeColor',
+  'strokeDasharray',
+  'strokeOpacity',
+  'strokeStyle',
+  'strokeWeight',
+  'visible',
+  'zIndex',
+  'zooms'
+]
+
+export const POLYGON_OPTION_KEYS = [
+  'bubble',
+  'cursor',
+  'draggable',
+  'extrusionHeight',
+  'fillColor',
+  'fillOpacity',
+  'roofColor',
+  'strokeColor',
+  'strokeDasharray',
+  'strokeOpacity',
+  'strokeStyle',
+  'strokeWeight',
+  'visible',
+  'wallColor',
+  'zIndex',
+  'zooms'
+]
+
+export const HEATMAP_OPTION_KEYS = [
+  'gradient',
+  'opacity',
+  'radius',
+  'visible',
+  'zIndex',
+  'zooms',
+  '3d'
+]
+
 export function isPlainObject(value) {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
