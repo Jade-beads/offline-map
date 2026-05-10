@@ -87,4 +87,4 @@ Detailed API specs and protocols are in [`docs/`](docs/):
 - [`map-vector-tile-layer.md`](docs/map-vector-tile-layer.md) — Vector tile layers
 - [`project-architecture.md`](docs/project-architecture.md) — Architecture overview
 
-Example integrations are in [`src/examples/`](src/examples/) and can be deleted once no longer needed.
+Example integrations are in [`src/examples/`](src/examples/). They are imported by [`src/components/MapWorkspace.vue`](src/components/MapWorkspace.vue) (the in-repo dev demo shell) — do not delete them while MapWorkspace still depends on them. Examples are dev-only and should not be carried into the offline business project.
