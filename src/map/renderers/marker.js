@@ -165,7 +165,9 @@ export function applyMarkerStyle(AMap, overlay, feature, style) {
 
 function createImageMarker(AMap, feature, position, style) {
   const icon = createImageIcon(AMap, style.image || style)
-  if (!icon) return createPinMarker(AMap, feature, position, { ...style, renderer: 'pin' })
+  if (!icon) {
+    throw new Error("createPointOverlays: renderer 为 'image' 时必须提供 image.src 或 image.url")
+  }
 
   return new AMap.Marker({
     ...createMarkerOptions(AMap, feature, position, style),
@@ -175,7 +177,9 @@ function createImageMarker(AMap, feature, position, style) {
 
 function createHtmlMarker(AMap, feature, position, style) {
   const content = createHtmlMarkerContent(style)
-  if (!content) return createPinMarker(AMap, feature, position, { ...style, renderer: 'pin' })
+  if (!content) {
+    throw new Error("createPointOverlays: renderer 为 'html' 时必须提供 html 或 content")
+  }
 
   return new AMap.Marker({
     ...createMarkerOptions(AMap, feature, position, style),

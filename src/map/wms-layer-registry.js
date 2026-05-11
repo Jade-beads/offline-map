@@ -114,13 +114,11 @@ export function createWMSLayer(layerId, context) {
   function createLayerInstance() {
     const WMSLayer = getWMSConstructor(AMap)
     if (!WMSLayer) {
-      console.warn('[AmapMap] AMap.TileLayer.WMS is unavailable in the offline package.')
-      return null
+      throw new Error('createWMSLayer: AMap.TileLayer.WMS 在当前离线包中不可用')
     }
 
     if (!options.url) {
-      console.warn(`[AmapMap] WMS layer "${layerId}" requires url.`)
-      return null
+      throw new Error(`createWMSLayer: 图层 "${layerId}" 缺少 url`)
     }
 
     return new WMSLayer({

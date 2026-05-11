@@ -260,7 +260,7 @@ export function getScopedStyleOverride(style, kind) {
   return style
 }
 
-function shouldShowOverlay(overlay, visible, hiddenCategories, hiddenFeatureIds) {
+export function shouldShowOverlay(overlay, visible, hiddenCategories, hiddenFeatureIds) {
   const category = getOverlayCategory(overlay)
   return visible &&
     !hiddenFeatureIds.has(getOverlayFeatureKey(overlay)) &&

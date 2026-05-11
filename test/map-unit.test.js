@@ -1,6 +1,7 @@
 import { createClusterData, getClusterFeatures } from '../src/map/cluster-layer-registry'
 import { createLayer } from '../src/map/layer-registry'
 import { mapActions, mapStore } from '../src/map/map-store'
+import { locaActions, locaStore } from '../src/loca/loca-store'
 import {
   getFeatureCategory,
   getFeatureId,
@@ -584,6 +585,71 @@ describe('map-store actions', () => {
     expect(mapStore.commandQueue).toHaveLength(0)
   })
 
+  test('throws when GeoJSON contract is invalid', () => {
+    expect(() => mapActions.renderGeoJSONLayer({
+      layerId: 'bad-geojson'
+    }, null)).toThrow(/geoJSON 不能为空/)
+
+    expect(() => mapActions.renderGeoJSONLayer({
+      layerId: 'bad-geojson'
+    }, {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          id: 'bad-point',
+          properties: {},
+          geometry: {
+            type: 'Point',
+            coordinates: ['bad', 31.2]
+          }
+        }
+      ]
+    })).toThrow(/必须是 \[lng, lat\]/)
+
+    expect(mapStore.commandQueue).toHaveLength(0)
+  })
+
+  test('throws when point renderer required fields are missing', () => {
+    expect(() => mapActions.renderGeoJSONLayer({
+      layerId: 'bad-image',
+      style: {
+        point: {
+          renderer: 'image'
+        }
+      }
+    }, {
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    })).toThrow(/image\.src/)
+
+    expect(() => mapActions.renderGeoJSONLayer({
+      layerId: 'bad-html',
+      style: {
+        point: {
+          renderer: 'html'
+        }
+      }
+    }, {
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    })).toThrow(/html 或 content/)
+
+    expect(mapStore.commandQueue).toHaveLength(0)
+  })
+
+  test('throws when WMS or vector tile url is missing', () => {
+    expect(() => mapActions.renderWMSLayer({
+      layerId: 'wms-missing-url'
+    })).toThrow(/url/)
+
+    expect(() => mapActions.renderVectorTileLayer({
+      layerId: 'mvt-missing-url'
+    })).toThrow(/url/)
+
+    expect(mapStore.commandQueue).toHaveLength(0)
+  })
+
   test('updates active tool and dispatches tool commands', () => {
     mapActions.activateDraw('polygon')
     expect(mapStore.activeTool).toBe('draw:polygon')
@@ -701,6 +767,31 @@ describe('layer-registry createLayer', () => {
     layer.hide()
     expect(FakeHeatMap.instances[0].visible).toBe(false)
   })
+
+  test('throws instead of downgrading invalid image or html marker styles', () => {
+    const layer = createLayer('invalid-marker', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    expect(() => layer.setData({
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    }, {
+      point: {
+        renderer: 'image'
+      }
+    })).toThrow(/image\.src/)
+
+    expect(() => layer.setData({
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    }, {
+      point: {
+        renderer: 'html'
+      }
+    })).toThrow(/html 或 content/)
+  })
 })
 
 describe('WMS and vector tile registries', () => {
@@ -744,6 +835,26 @@ describe('WMS and vector tile registries', () => {
     layer.destroy()
     expect(map.removed).toContain(FakeWMSLayer.instances[0])
     expect(FakeWMSLayer.instances[0].destroyed).toBe(true)
+  })
+
+  test('throws when WMS layer url or constructor is missing', () => {
+    const layer = createWMSLayer('wms-missing-url', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    expect(() => layer.setData({})).toThrow(/缺少 url/)
+
+    const missingConstructorLayer = createWMSLayer('wms-missing-constructor', {
+      AMap: {
+        TileLayer: {}
+      },
+      map: createFakeMap()
+    })
+
+    expect(() => missingConstructorLayer.setData({
+      url: 'http://localhost/geoserver/wms'
+    })).toThrow(/不可用/)
   })
 
   test('creates vector tile layer, binds events and patches style', () => {
@@ -802,5 +913,51 @@ describe('WMS and vector tile registries', () => {
 
     layer.reload()
     expect(FakeVectorTileLayer.instances[0].reloaded).toBe(true)
+  })
+
+  test('throws when vector tile layer url or constructor is missing', () => {
+    const layer = createVectorTileLayer('mvt-missing-url', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    expect(() => layer.setData({})).toThrow(/缺少 url/)
+
+    const missingConstructorLayer = createVectorTileLayer('mvt-missing-constructor', {
+      AMap: {},
+      map: createFakeMap()
+    })
+
+    expect(() => missingConstructorLayer.setData({
+      url: 'http://localhost/tiles/[z]/[x]/[y].pbf'
+    })).toThrow(/不可用/)
+  })
+})
+
+describe('loca-store actions', () => {
+  beforeEach(() => {
+    locaActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+    locaActions.clearLayerInfo()
+  })
+
+  test('throws when Loca GeoJSON contract is invalid', () => {
+    expect(() => locaActions.renderGeoJSONLayer({
+      layerId: 'bad-loca'
+    }, {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          id: 'bad-line',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: [[121.5, 31.2]]
+          }
+        }
+      ]
+    })).toThrow(/至少需要 2 个坐标点/)
+
+    expect(locaStore.commandQueue).toHaveLength(0)
   })
 })

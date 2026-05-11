@@ -1,4 +1,5 @@
 import Vue from 'vue'
+import { assertGeoJSONInput } from '../map/utils/assertions'
 
 const DEFAULT_FEATURE_HIGHLIGHT_STYLE = {
   radius: 18,
@@ -100,6 +101,7 @@ export const locaActions = {
       : params || {}
     const layerId = renderParams.layerId
     assertLayerId(layerId, 'renderGeoJSONLayer')
+    assertGeoJSONInput(geoJSON, 'locaActions.renderGeoJSONLayer')
 
     this.dispatchLocaCommand('loca:layer:render', {
       layerId,

@@ -1,4 +1,9 @@
 import Vue from 'vue'
+import {
+  assertGeoJSONInput,
+  assertPointRendererStyle,
+  assertRequiredString
+} from './utils/assertions'
 
 const DEFAULT_FEATURE_HIGHLIGHT_STYLE = {
   point: {
@@ -390,12 +395,16 @@ export const mapActions = {
       : params || {}
     const layerId = renderParams.layerId
     assertLayerId(layerId, 'renderGeoJSONLayer')
+    assertGeoJSONInput(geoJSON, 'mapActions.renderGeoJSONLayer')
+
+    const style = renderParams.style || (geoJSON && (geoJSON.style || (geoJSON.properties && geoJSON.properties.style)))
+    assertPointRendererStyle(style, 'mapActions.renderGeoJSONLayer')
 
     this.dispatchMapCommand('layer:render', {
       layerId,
       geoJSON,
       visible: renderParams.visible,
-      style: renderParams.style || (geoJSON && (geoJSON.style || (geoJSON.properties && geoJSON.properties.style))),
+      style,
       events: renderParams.events,
       hoverStyle: renderParams.hoverStyle,
       clickStyle: renderParams.clickStyle,
@@ -434,6 +443,7 @@ export const mapActions = {
       : params || {}
     const layerId = renderParams.layerId
     assertLayerId(layerId, 'renderWMSLayer')
+    assertRequiredString(renderParams.url, 'mapActions.renderWMSLayer', 'url')
 
     this.dispatchMapCommand('wms:render', {
       ...renderParams,
@@ -447,6 +457,7 @@ export const mapActions = {
       : params || {}
     const layerId = renderParams.layerId
     assertLayerId(layerId, 'renderVectorTileLayer')
+    assertRequiredString(renderParams.url, 'mapActions.renderVectorTileLayer', 'url')
 
     this.dispatchMapCommand('vector-tile:render', {
       ...renderParams,

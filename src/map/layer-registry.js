@@ -22,6 +22,7 @@ import {
   hasFeatureStyle,
   isPlainObject,
   pickDefined,
+  shouldShowOverlay,
   updateHiddenCategories,
   updateHiddenFeatureIds
 } from './utils/feature'

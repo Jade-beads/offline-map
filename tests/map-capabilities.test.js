@@ -1299,16 +1299,14 @@ describe('WMS layer registry', () => {
     expect(FakeWMSLayer.instances[0].params.viewparams).toBe('age:0|1|2;gender:0|1')
   })
 
-  test('ignores empty WMS option updates without reading visible from undefined', () => {
+  test('requires WMS url before creating layer and keeps existing options on empty patches', () => {
     FakeWMSLayer.instances = []
     const layer = createWMSLayer('geo-server-grid', {
       AMap: createFakeAMap(),
       map: createFakeMap()
     })
 
-    expect(() => layer.setData()).not.toThrow()
-    expect(() => layer.setStyle(null)).not.toThrow()
-    expect(() => layer.patchStyle(undefined)).not.toThrow()
+    expect(() => layer.setData()).toThrow(/缺少 url/)
     expect(FakeWMSLayer.instances).toHaveLength(0)
 
     layer.setData({
@@ -1321,7 +1319,9 @@ describe('WMS layer registry', () => {
     expect(FakeWMSLayer.instances).toHaveLength(1)
     expect(layer.getInfo().visible).toBe(false)
 
+    expect(() => layer.setStyle(null)).not.toThrow()
     expect(() => layer.patchStyle(null)).not.toThrow()
+    expect(() => layer.patchStyle(undefined)).not.toThrow()
     expect(layer.getInfo().visible).toBe(false)
     expect(layer.getInfo().param.LAYERS).toBe('demo:grid')
   })

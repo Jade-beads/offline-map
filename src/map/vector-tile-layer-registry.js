@@ -237,13 +237,11 @@ export function createVectorTileLayer(layerId, context) {
   function createLayerInstance() {
     const VectorTileLayer = getVectorTileConstructor(AMap)
     if (!VectorTileLayer) {
-      console.warn('[AmapMap] AMap.MapboxVectorTileLayer is unavailable in the offline package.')
-      return null
+      throw new Error('createVectorTileLayer: AMap.MapboxVectorTileLayer 在当前离线包中不可用')
     }
 
     if (!options.url) {
-      console.warn(`[AmapMap] vector tile layer "${layerId}" requires url.`)
-      return null
+      throw new Error(`createVectorTileLayer: 图层 "${layerId}" 缺少 url`)
     }
 
     return new VectorTileLayer({

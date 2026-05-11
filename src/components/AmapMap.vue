@@ -20,8 +20,6 @@ const SATELLITE_TILE_HOSTS = [
   'webst03.is.autonavi.com',
   'webst04.is.autonavi.com'
 ]
-const SATELLITE_TILE_TEMPLATE = 'http://webst0{1,2,3,4}.is.autonavi.com/appmaptile?style=6&x=[x]&y=[y]&z=[z]'
-
 const MAP_OPTIONS = {
   viewMode: '2D',
   features: [],
@@ -32,18 +30,12 @@ const MAP_OPTIONS = {
 }
 
 function createSatelliteLayer(AMap) {
-  // AMap.TileLayer.Satellite 是 TileLayer 的子类，离线包不一定打包
-  const LayerConstructor = typeof AMap.TileLayer.Satellite === 'function' ? AMap.TileLayer.Satellite : AMap.TileLayer
-  const layer = new LayerConstructor({
-    tileUrl: SATELLITE_TILE_TEMPLATE,
+  return new AMap.TileLayer({
     getTileUrl: getSatelliteTileUrl,
     zIndex: 1,
     zooms: [3, 18],
     dataZooms: [3, 18]
   })
-
-  layer.setTileUrl(SATELLITE_TILE_TEMPLATE)
-  return layer
 }
 
 function getSatelliteTileUrl(x, y, z) {
@@ -395,6 +387,17 @@ export default {
 </style>
 
 <style>
+/*
+ * AMap3.js 中瓦片图层容器（.amap-e）是 position:absolute，
+ * 而渲染叠加层的 WebGL canvas 是 position:static。
+ * CSS 层叠规则下定位元素天然在非定位元素之上，导致卫星瓦片异步加载后
+ * 遮住 WebGL canvas 上的点线面。
+ * 将瓦片容器压到 z-index:-1，使 WebGL canvas 显示在其上方。
+ */
+.amap-layers > .amap-e {
+  z-index: -1;
+}
+
 .geojson-map-marker {
   width: 28px;
   height: 28px;
