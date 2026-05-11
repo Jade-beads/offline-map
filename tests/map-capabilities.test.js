@@ -225,6 +225,7 @@ class FakeVectorOverlay {
     this.options = options
     this.extData = options.extData || null
     this.visible = options.visible !== false
+    this.map = options.map === undefined ? 'map' : options.map
     this.path = options.path || []
     this.bounds = options.bounds || null
     this.center = options.center || null
@@ -252,6 +253,10 @@ class FakeVectorOverlay {
 
   setExtData(extData) {
     this.extData = extData
+  }
+
+  setMap(map) {
+    this.map = map
   }
 
   getExtData() {
@@ -1709,6 +1714,14 @@ describe('draw overlay management', () => {
       ],
       bounds: new FakeBounds(new FakeLngLat(121.1, 31.1), new FakeLngLat(121.2, 31.2))
     })
+    const cachedBusinessOverlay = new FakeVectorOverlay()
+    controller.mouseTool = {
+      overlays: {
+        polygon: [overlay, overlay, cachedBusinessOverlay],
+        circle: []
+      },
+      close() {}
+    }
 
     controller.currentDrawShape = 'polygon'
     controller.handleDrawComplete({
@@ -1728,12 +1741,14 @@ describe('draw overlay management', () => {
     expect(overlay.getExtData().type).toBe('draw-overlay')
     expect(typeof overlay.handlers.rightclick).toBe('function')
     expect(activeTools).toContain('')
+    expect(controller.mouseTool.overlays.polygon).toEqual([cachedBusinessOverlay])
 
     controller.deleteDrawOverlay({
       id: results[0].id
     })
 
-    expect(map.removed).toContain(overlay)
+    expect(overlay.map).toBe(null)
+    expect(cachedBusinessOverlay.map).toBe('map')
     expect(clearResultCount).toBe(1)
     expect(overlayInfos[overlayInfos.length - 1]).toBe(null)
     expect(overlayActions[1].type).toBe('delete')
@@ -1870,6 +1885,8 @@ describe('draw overlay management', () => {
 
     controller.clearDrawOverlays()
 
+    expect(polygon.map).toBe(null)
+    expect(circle.map).toBe(null)
     const clearAction = overlayActions[overlayActions.length - 1]
     expect(clearAction.type).toBe('clear')
     expect(clearAction.ids).toHaveLength(2)
@@ -1938,7 +1955,7 @@ describe('draw overlay management', () => {
     const deleteItem = menu.items.find((item) => item.label === '删除图形')
     deleteItem.handler()
 
-    expect(map.removed).toContain(overlay)
+    expect(overlay.map).toBe(null)
     expect(clearResultCount).toBe(1)
     expect(menu.closed).toBe(true)
   })
