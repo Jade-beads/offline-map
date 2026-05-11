@@ -86,6 +86,36 @@ function scheduleTask(callback, delay) {
   return timerHost.setTimeout(callback, delay)
 }
 
+function detachOverlayFromMap(map, overlay) {
+  if (!overlay) return
+
+  if (typeof overlay.setMap === 'function') {
+    overlay.setMap(null)
+    return
+  }
+
+  if (map && typeof map.remove === 'function') {
+    map.remove(overlay)
+  }
+}
+
+function detachOverlaysFromMap(map, overlays) {
+  overlays.forEach((overlay) => {
+    detachOverlayFromMap(map, overlay)
+  })
+}
+
+function removeMouseToolOverlayCache(mouseTool, overlay) {
+  if (!mouseTool || !mouseTool.overlays || !overlay) return
+
+  Object.keys(mouseTool.overlays).forEach((key) => {
+    const overlays = mouseTool.overlays[key]
+    if (Array.isArray(overlays)) {
+      mouseTool.overlays[key] = overlays.filter((item) => item !== overlay)
+    }
+  })
+}
+
 function escapeHtml(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
@@ -1007,6 +1037,7 @@ export class MapController {
 
     this.bindDrawOverlayContextMenu(record)
     this.drawOverlays.set(id, record)
+    removeMouseToolOverlayCache(this.mouseTool, overlay)
     return record
   }
 
@@ -1220,11 +1251,8 @@ export class MapController {
     }
 
     this.unbindDrawOverlayContextMenu(record)
-    if (typeof this.map.remove === 'function') {
-      this.map.remove(record.overlay)
-    } else if (record.overlay && typeof record.overlay.setMap === 'function') {
-      record.overlay.setMap(null)
-    }
+    removeMouseToolOverlayCache(this.mouseTool, record.overlay)
+    detachOverlayFromMap(this.map, record.overlay)
 
     this.drawOverlays.delete(record.id)
     if (this.activeDrawOverlayId === record.id) {
@@ -1259,18 +1287,11 @@ export class MapController {
 
     const overlays = records.map((record) => {
       this.unbindDrawOverlayContextMenu(record)
+      removeMouseToolOverlayCache(this.mouseTool, record.overlay)
       return record.overlay
     }).filter(Boolean)
 
-    if (overlays.length && typeof this.map.remove === 'function') {
-      this.map.remove(overlays)
-    } else {
-      overlays.forEach((overlay) => {
-        if (overlay && typeof overlay.setMap === 'function') {
-          overlay.setMap(null)
-        }
-      })
-    }
+    detachOverlaysFromMap(this.map, overlays)
 
     this.drawOverlays.clear()
     this.activeDrawOverlayId = ''
