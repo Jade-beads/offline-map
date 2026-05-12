@@ -564,4 +564,34 @@ export default {
   border-radius: 50%;
   background: #fff;
 }
+
+.amap-marker-label {
+  box-sizing: border-box;
+  max-width: 180px;
+  padding: 5px 9px !important;
+  overflow: hidden;
+  border: 1px solid rgba(37, 99, 235, 0.18) !important;
+  border-radius: 6px;
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(4px);
+}
+
+.amap-marker-label::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid rgba(37, 99, 235, 0.18);
+  border-bottom: 1px solid rgba(37, 99, 235, 0.18);
+  background: rgba(255, 255, 255, 0.96);
+  transform: rotate(45deg);
+}
 </style>

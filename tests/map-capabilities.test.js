@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { MessageBox } from 'element-ui'
 import {
   BUSINESS_POI_CLUSTER_LAYER_ID,
   DISTRICT_COUNT_LAYER_ID,
@@ -456,6 +457,47 @@ class FakeWMSLayer {
 }
 FakeWMSLayer.instances = []
 
+class FakeTileLayer {
+  constructor(options = {}) {
+    this.options = options
+    this.visible = options.visible !== false
+    FakeTileLayer.instances.push(this)
+  }
+
+  getTileUrl(x, y, z) {
+    return this.options.getTileUrl(x, y, z)
+  }
+
+  setOpacity(opacity) {
+    this.opacity = opacity
+    this.options.opacity = opacity
+  }
+
+  setzIndex(zIndex) {
+    this.zIndex = zIndex
+    this.options.zIndex = zIndex
+  }
+
+  setZooms(zooms) {
+    this.zooms = zooms
+    this.options.zooms = zooms
+  }
+
+  show() {
+    this.visible = true
+  }
+
+  hide() {
+    this.visible = false
+  }
+
+  destroy() {
+    this.destroyed = true
+  }
+}
+FakeTileLayer.instances = []
+FakeTileLayer.WMS = FakeWMSLayer
+
 class FakeMapboxVectorTileLayer {
   constructor(options = {}) {
     this.options = options
@@ -530,9 +572,7 @@ function createFakeAMap() {
     ContextMenu: FakeContextMenu,
     MarkerCluster: FakeMarkerCluster,
     MapboxVectorTileLayer: FakeMapboxVectorTileLayer,
-    TileLayer: {
-      WMS: FakeWMSLayer
-    }
+    TileLayer: FakeTileLayer
   }
 }
 
@@ -1145,6 +1185,35 @@ describe('map action command entry', () => {
     expect(mapStore.commandQueue[2].payload.id).toBe('custom-001')
   })
 
+  test('dispatches custom marker render command', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    mapActions.renderCustomMarkers([
+      {
+        id: 'custom-001',
+        name: '上海锚点',
+        position: [121.541016, 31.239651]
+      }
+    ])
+
+    expect(mapStore.commandQueue[0].type).toBe('marker:render')
+    expect(mapStore.commandQueue[0].payload.markers[0].id).toBe('custom-001')
+  })
+
+  test('dispatches clear layers except command', () => {
+    mapActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+
+    mapActions.clearLayersExcept(['keep-layer', 'other-keep-layer'])
+
+    expect(mapStore.commandQueue[0]).toEqual({
+      seq: mapStore.commandQueue[0].seq,
+      type: 'layers:clear-except',
+      payload: {
+        layerIds: ['keep-layer', 'other-keep-layer']
+      }
+    })
+  })
+
   test('controller routes patch style command and syncs layer info', () => {
     const synced = []
     const controller = new MapController({
@@ -1189,6 +1258,47 @@ describe('map action command entry', () => {
         featureCount: 1
       }
     })
+  })
+
+  test('controller clears every layer except target layer ids', () => {
+    const removed = []
+    const destroyed = []
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map: createFakeMap(),
+      actions: {
+        removeLayerInfo(layerId) {
+          removed.push(layerId)
+        }
+      }
+    })
+
+    controller.layers.set('keep-layer', {
+      destroy() {
+        destroyed.push('keep-layer')
+      }
+    })
+    controller.layers.set('remove-layer', {
+      destroy() {
+        destroyed.push('remove-layer')
+      }
+    })
+    controller.layers.set('other-keep-layer', {
+      destroy() {
+        destroyed.push('other-keep-layer')
+      }
+    })
+
+    controller.handleCommand({
+      type: 'layers:clear-except',
+      payload: {
+        layerIds: ['keep-layer', 'other-keep-layer']
+      }
+    })
+
+    expect(Array.from(controller.layers.keys())).toEqual(['keep-layer', 'other-keep-layer'])
+    expect(destroyed).toEqual(['remove-layer'])
+    expect(removed).toEqual(['remove-layer'])
   })
 
   test('controller prepares map tools before coordinate picking', () => {
@@ -1534,12 +1644,79 @@ describe('vector tile layer registry', () => {
     })
     expect(removed).toEqual(['avg-price-mvt'])
   })
+
+  test('controller renders WMTS layer and keeps common layer commands working', () => {
+    FakeTileLayer.instances = []
+    const synced = []
+    const removed = []
+    const map = createFakeMap()
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setLayerInfo(layerId, info) {
+          synced.push({ layerId, info })
+        },
+        removeLayerInfo(layerId) {
+          removed.push(layerId)
+        }
+      }
+    })
+
+    controller.handleCommand({
+      type: 'wmts:render',
+      payload: {
+        layerId: 'wmts-grid',
+        url: 'http://localhost/wmts/{z}/{x}/{y}.png',
+        visible: true,
+        opacity: 0.8
+      }
+    })
+
+    expect(FakeTileLayer.instances).toHaveLength(1)
+    expect(map.added[0]).toBe(FakeTileLayer.instances[0])
+    expect(FakeTileLayer.instances[0].getTileUrl(1, 2, 3)).toBe('http://localhost/wmts/3/1/2.png')
+    expect(synced[0].layerId).toBe('wmts-grid')
+    expect(synced[0].info.type).toBe('wmts')
+    expect(synced[0].info.template).toBe(true)
+
+    controller.handleCommand({
+      type: 'layer:style:patch',
+      payload: {
+        layerId: 'wmts-grid',
+        stylePatch: {
+          opacity: 0.42
+        }
+      }
+    })
+    expect(FakeTileLayer.instances[0].opacity).toBe(0.42)
+    expect(synced[synced.length - 1].info.opacity).toBe(0.42)
+
+    controller.handleCommand({
+      type: 'layer:visible',
+      payload: {
+        layerId: 'wmts-grid',
+        visible: false
+      }
+    })
+    expect(FakeTileLayer.instances[0].visible).toBe(false)
+    expect(synced[synced.length - 1].info.visible).toBe(false)
+
+    controller.handleCommand({
+      type: 'layer:clear',
+      payload: {
+        layerId: 'wmts-grid'
+      }
+    })
+    expect(removed).toEqual(['wmts-grid'])
+  })
 })
 
 describe('custom marker result', () => {
   test('stores clicked custom marker coordinates for business components', () => {
     const map = createFakeMap()
     const results = []
+    const markerActions = []
     const activeTools = []
     const controller = new MapController({
       AMap: createFakeAMap(),
@@ -1547,6 +1724,9 @@ describe('custom marker result', () => {
       actions: {
         setCustomMarkerResult(result) {
           results.push(result)
+        },
+        setCustomMarkerAction(action) {
+          markerActions.push(action)
         },
         setActiveTool(tool) {
           activeTools.push(tool)
@@ -1578,15 +1758,18 @@ describe('custom marker result', () => {
     expect(map.added[0].extData.position).toEqual([121.541016, 31.239651])
     expect(map.handlers.click).toBeUndefined()
     expect(activeTools).toEqual([''])
+    expect(markerActions[0].type).toBe('create')
+    expect(markerActions[0].result.position).toEqual([121.541016, 31.239651])
   })
 
-  test('custom marker context menu renames, requests save and deletes marker', () => {
+  test('custom marker context menu renames, requests save and deletes marker', async () => {
     FakeContextMenu.instances = []
-    const previousPrompt = globalThis.prompt
-    globalThis.prompt = () => '上海锚点'
+    const previousPrompt = MessageBox.prompt
+    MessageBox.prompt = () => Promise.resolve({ value: '上海锚点' })
     const map = createFakeMap()
     const results = []
     const saveRequests = []
+    const markerActions = []
     let clearResultCount = 0
     const controller = new MapController({
       AMap: createFakeAMap(),
@@ -1600,6 +1783,9 @@ describe('custom marker result', () => {
         },
         setCustomMarkerSaveRequest(request) {
           saveRequests.push(request)
+        },
+        setCustomMarkerAction(action) {
+          markerActions.push(action)
         },
         setActiveTool() {},
         setLayerInfo() {},
@@ -1640,10 +1826,12 @@ describe('custom marker result', () => {
 
       const renameMenu = FakeContextMenu.instances[0]
       renameMenu.items.find((item) => item.index === 0).handler()
+      await Promise.resolve()
       expect(marker.title).toBe('上海锚点')
       expect(marker.label.content).toBe('上海锚点')
       expect(marker.getExtData().name).toBe('上海锚点')
       expect(results[results.length - 1].name).toBe('上海锚点')
+      expect(markerActions[markerActions.length - 1].type).toBe('update')
       expect(renameMenu.closed).toBe(true)
 
       marker.handlers.rightclick({
@@ -1657,6 +1845,7 @@ describe('custom marker result', () => {
       expect(saveRequests[0].name).toBe('上海锚点')
       expect(saveRequests[0].position).toEqual([121.541016, 31.239651])
       expect(typeof saveRequests[0].requestedAt).toBe('number')
+      expect(markerActions[markerActions.length - 1].type).toBe('save')
       expect(saveMenu.closed).toBe(true)
 
       marker.handlers.rightclick({
@@ -1668,10 +1857,75 @@ describe('custom marker result', () => {
       deleteMenu.items.find((item) => item.index === 2).handler()
       expect(map.removed).toContain(marker)
       expect(clearResultCount).toBe(1)
+      expect(markerActions[markerActions.length - 1].type).toBe('delete')
       expect(deleteMenu.closed).toBe(true)
     } finally {
-      globalThis.prompt = previousPrompt
+      MessageBox.prompt = previousPrompt
     }
+  })
+
+  test('renders saved custom markers with context menu and emits delete action', () => {
+    FakeContextMenu.instances = []
+    const map = createFakeMap()
+    const results = []
+    const markerActions = []
+    let clearResultCount = 0
+    const controller = new MapController({
+      AMap: createFakeAMap(),
+      map,
+      actions: {
+        setCustomMarkerResult(result) {
+          results.push(result)
+        },
+        clearCustomMarkerResult() {
+          clearResultCount += 1
+        },
+        setCustomMarkerAction(action) {
+          markerActions.push(action)
+        },
+        setActiveTool() {},
+        setLayerInfo() {},
+        removeLayerInfo() {}
+      }
+    })
+
+    controller.renderCustomMarkers({
+      markers: [
+        {
+          id: 'saved-marker-001',
+          name: '上海锚点',
+          lng: 121.541016,
+          lat: 31.239651
+        }
+      ]
+    })
+
+    expect(markerActions[0].type).toBe('render')
+    expect(markerActions[0].ids).toEqual(['saved-marker-001'])
+    expect(map.added).toHaveLength(1)
+    const marker = map.added[0]
+    expect(marker.title).toBe('上海锚点')
+    expect(marker.getExtData().id).toBe('saved-marker-001')
+    expect(typeof marker.handlers.rightclick).toBe('function')
+
+    marker.handlers.rightclick({
+      lnglat: new FakeLngLat(121.541016, 31.239651),
+      originEvent: {
+        preventDefault() {},
+        stopPropagation() {}
+      }
+    })
+
+    expect(results[0].id).toBe('saved-marker-001')
+    const menu = FakeContextMenu.instances[0]
+    menu.items.find((item) => item.index === 2).handler()
+
+    expect(map.removed).toContain(marker)
+    expect(clearResultCount).toBe(1)
+    expect(markerActions.map((action) => action.type)).toEqual(['render', 'delete'])
+    expect(markerActions[1].id).toBe('saved-marker-001')
+    expect(markerActions[1].result.position).toEqual([121.541016, 31.239651])
+    expect(markerActions[1].markerCount).toBe(0)
   })
 })
 

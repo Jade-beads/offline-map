@@ -15,6 +15,7 @@ import {
   resolveScaleValue
 } from '../src/map/style-resolver'
 import { createVectorTileLayer } from '../src/map/vector-tile-layer-registry'
+import { buildWMTSTileUrl, createWMTSLayer } from '../src/map/wmts-layer-registry'
 import { createWMSLayer } from '../src/map/wms-layer-registry'
 
 const pointFeature = {
@@ -209,6 +210,44 @@ class FakeWMSLayer {
 }
 FakeWMSLayer.instances = []
 
+class FakeTileLayer {
+  constructor(options = {}) {
+    this.options = options
+    this.visible = options.visible !== false
+    FakeTileLayer.instances.push(this)
+  }
+
+  getTileUrl(x, y, z) {
+    return this.options.getTileUrl(x, y, z)
+  }
+
+  setOpacity(opacity) {
+    this.opacity = opacity
+  }
+
+  setzIndex(zIndex) {
+    this.zIndex = zIndex
+  }
+
+  setZooms(zooms) {
+    this.zooms = zooms
+  }
+
+  show() {
+    this.visible = true
+  }
+
+  hide() {
+    this.visible = false
+  }
+
+  destroy() {
+    this.destroyed = true
+  }
+}
+FakeTileLayer.instances = []
+FakeTileLayer.WMS = FakeWMSLayer
+
 class FakeVectorTileLayer {
   constructor(options = {}) {
     this.options = options
@@ -270,7 +309,11 @@ function createFakeMap() {
     boundsCalls: [],
     fitViewCalls: [],
     add(layer) {
-      this.added.push(layer)
+      if (Array.isArray(layer)) {
+        this.added.push(...layer)
+      } else {
+        this.added.push(layer)
+      }
     },
     remove(layer) {
       if (Array.isArray(layer)) {
@@ -298,9 +341,7 @@ function createFakeAMap() {
     Polyline: FakeVectorOverlay,
     Polygon: FakeVectorOverlay,
     HeatMap: FakeHeatMap,
-    TileLayer: {
-      WMS: FakeWMSLayer
-    },
+    TileLayer: FakeTileLayer,
     MapboxVectorTileLayer: FakeVectorTileLayer
   }
 }
@@ -519,6 +560,7 @@ describe('map-store actions', () => {
     mapActions.clearDrawResult()
     mapActions.clearCoordinatePickResult()
     mapActions.clearCustomMarkerResult()
+    mapActions.clearCustomMarkerAction()
     mapActions.setActiveTool('')
   })
 
@@ -582,6 +624,26 @@ describe('map-store actions', () => {
     mapActions.focusFeature('devices', null)
 
     expect(mapStore.commandQueue).toHaveLength(0)
+  })
+
+  test('dispatches WMTS render command and validates required params', () => {
+    expect(() => mapActions.renderWMTSLayer({
+      url: 'http://localhost/wmts/{z}/{x}/{y}.png'
+    })).toThrow(/layerId/)
+
+    expect(() => mapActions.renderWMTSLayer({
+      layerId: 'wmts-missing-url'
+    })).toThrow(/url/)
+
+    mapActions.renderWMTSLayer({
+      layerId: 'wmts-grid',
+      url: 'http://localhost/wmts/{z}/{x}/{y}.png',
+      visible: true
+    })
+
+    expect(mapStore.commandQueue).toHaveLength(1)
+    expect(mapStore.commandQueue[0].type).toBe('wmts:render')
+    expect(mapStore.commandQueue[0].payload.layerId).toBe('wmts-grid')
   })
 
   test('updates active tool and dispatches tool commands', () => {
@@ -706,7 +768,106 @@ describe('layer-registry createLayer', () => {
 describe('WMS and vector tile registries', () => {
   beforeEach(() => {
     FakeWMSLayer.instances = []
+    FakeTileLayer.instances = []
     FakeVectorTileLayer.instances = []
+  })
+
+  test('builds WMTS template and standard KVP tile urls', () => {
+    expect(buildWMTSTileUrl({
+      template: true,
+      url: 'http://localhost/wmts/{z}/{x}/{y}.png'
+    }, 12, 26, 8)).toBe('http://localhost/wmts/8/12/26.png')
+
+    const url = buildWMTSTileUrl({
+      template: false,
+      url: 'http://localhost/geoserver/gwc/service/wmts',
+      service: 'WMTS',
+      request: 'GetTile',
+      version: '1.0.0',
+      layer: 'demo:grid',
+      style: 'default',
+      tileMatrixSet: 'EPSG:3857',
+      format: 'image/png',
+      params: {
+        token: 'abc'
+      }
+    }, 12, 26, 8)
+
+    expect(url).toContain('SERVICE=WMTS')
+    expect(url).toContain('REQUEST=GetTile')
+    expect(url).toContain('LAYER=demo%3Agrid')
+    expect(url).toContain('TILEMATRIXSET=EPSG%3A3857')
+    expect(url).toContain('TILEMATRIX=8')
+    expect(url).toContain('TILEROW=26')
+    expect(url).toContain('TILECOL=12')
+    expect(url).toContain('token=abc')
+  })
+
+  test('creates WMTS template layer, patches style and manages visibility', () => {
+    const map = createFakeMap()
+    const layer = createWMTSLayer('wmts-template', {
+      AMap: createFakeAMap(),
+      map
+    })
+
+    layer.setData({
+      url: 'http://localhost/wmts/{z}/{x}/{y}.png',
+      visible: false,
+      opacity: 0.72,
+      zIndex: 44
+    })
+
+    expect(FakeTileLayer.instances).toHaveLength(1)
+    expect(map.added[0]).toBe(FakeTileLayer.instances[0])
+    expect(FakeTileLayer.instances[0].getTileUrl(3, 5, 7)).toBe('http://localhost/wmts/7/3/5.png')
+    expect(layer.getInfo().type).toBe('wmts')
+    expect(layer.getInfo().template).toBe(true)
+    expect(layer.getInfo().visible).toBe(false)
+
+    layer.patchStyle({
+      visible: true,
+      opacity: 0.46
+    })
+
+    expect(FakeTileLayer.instances[0].visible).toBe(true)
+    expect(FakeTileLayer.instances[0].opacity).toBe(0.46)
+
+    layer.destroy()
+    expect(map.removed).toContain(FakeTileLayer.instances[0])
+    expect(FakeTileLayer.instances[0].destroyed).toBe(true)
+  })
+
+  test('creates WMTS standard KVP layer and validates required protocol fields', () => {
+    const layer = createWMTSLayer('wmts-kvp', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    expect(() => layer.setData({
+      url: 'http://localhost/geoserver/gwc/service/wmts'
+    })).toThrow(/layer/)
+
+    expect(() => layer.setData({
+      url: 'http://localhost/geoserver/gwc/service/wmts',
+      layer: 'demo:grid'
+    })).toThrow(/tileMatrixSet/)
+
+    layer.setData({
+      url: 'http://localhost/geoserver/gwc/service/wmts',
+      layer: 'demo:grid',
+      tileMatrixSet: 'EPSG:3857',
+      tileMatrixPrefix: 'EPSG:3857:',
+      params: {
+        token: 'abc'
+      }
+    })
+
+    const tileUrl = FakeTileLayer.instances[0].getTileUrl(2, 4, 6)
+    expect(tileUrl).toContain('LAYER=demo%3Agrid')
+    expect(tileUrl).toContain('TILEMATRIX=EPSG%3A3857%3A6')
+    expect(tileUrl).toContain('TILEROW=4')
+    expect(tileUrl).toContain('TILECOL=2')
+    expect(tileUrl).toContain('token=abc')
   })
 
   test('creates WMS layer, patches params and manages visibility', () => {

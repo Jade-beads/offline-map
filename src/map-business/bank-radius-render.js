@@ -5,26 +5,7 @@ export const BANK_RADIUS_LAYER_ID = 'business-bank-radius'
 
 const CHINA_BANK_NAME = '中国银行'
 
-function createBankIconDataUri(label, color) {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-      <circle cx="32" cy="32" r="29" fill="${color}" stroke="#ffffff" stroke-width="5"/>
-      <text x="32" y="39" text-anchor="middle" font-size="20" font-family="Arial, sans-serif" fill="#ffffff" font-weight="700">${label}</text>
-    </svg>
-  `
 
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-}
-
-const DEFAULT_ICON_MAP = {
-  中国银行: createBankIconDataUri('中', '#dc2626'),
-  工商银行: createBankIconDataUri('工', '#b91c1c'),
-  农业银行: createBankIconDataUri('农', '#16a34a'),
-  建设银行: createBankIconDataUri('建', '#2563eb'),
-  交通银行: createBankIconDataUri('交', '#1d4ed8'),
-  招商银行: createBankIconDataUri('招', '#ef4444'),
-  默认: createBankIconDataUri('银', '#64748b')
-}
 
 function normalizeCoordinate(record) {
   const coordinates = record && record.geom && record.geom.coordinates
@@ -148,7 +129,7 @@ export function renderBankPointsWithChinaBankRadius(records = [], options = {}) 
         image: {
           size: [32, 32],
           imageSize: [32, 32],
-          src: ({ properties }) => iconMap[properties.bankType] || iconMap[properties.category] || iconMap.默认
+          src: ({ properties }) => `/logo/${properties.bankType}.png`
         },
         zIndex: 80
       }

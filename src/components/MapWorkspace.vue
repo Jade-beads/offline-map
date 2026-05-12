@@ -6,7 +6,7 @@
       <input
         v-model="keyword"
         type="text"
-        placeholder="输入坐标，例如 117.2272,31.8206"
+        placeholder="输入坐标，例如 121.4737,31.2304"
         @keyup.enter="actions.searchCoordinate(keyword)"
       >
       <button class="icon-button search-button" type="button" title="定位坐标" @click="actions.searchCoordinate(keyword)">

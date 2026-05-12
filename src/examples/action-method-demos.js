@@ -51,19 +51,19 @@ export const mapMethodDemos = {
   setDrawResult: () => mapActions.setDrawResult(null),
   clearDrawResult: () => mapActions.clearDrawResult(),
   setCoordinatePickResult: () => mapActions.setCoordinatePickResult({
-    position: [117.2272, 31.8206],
-    lng: 117.2272,
-    lat: 31.8206,
-    coordinate: '117.2272,31.8206',
+    position: [121.4737, 31.2304],
+    lng: 121.4737,
+    lat: 31.2304,
+    coordinate: '121.4737,31.2304',
     timestamp: Date.now()
   }),
   clearCoordinatePickResult: () => mapActions.clearCoordinatePickResult(),
   setCustomMarkerResult: () => mapActions.setCustomMarkerResult({
     id: 'demo-custom-marker',
     type: 'custom-marker',
-    position: [117.2272, 31.8206],
-    lng: 117.2272,
-    lat: 31.8206
+    position: [121.4737, 31.2304],
+    lng: 121.4737,
+    lat: 31.2304
   }),
   clearCustomMarkerResult: () => mapActions.clearCustomMarkerResult(),
   setLayerInfo: () => mapActions.setLayerInfo('demo-info', { visible: true, featureCount: 0 }),
@@ -80,7 +80,7 @@ export const mapMethodDemos = {
   activateCustomMarker: () => mapActions.activateCustomMarker(),
   zoomIn: () => mapActions.zoomIn(),
   zoomOut: () => mapActions.zoomOut(),
-  searchCoordinate: () => mapActions.searchCoordinate('117.2272,31.8206'),
+  searchCoordinate: () => mapActions.searchCoordinate('121.4737,31.2304'),
   renderGeoJSONLayer: () => renderMixedOverlayExample(),
   renderGeoJSONClusterLayer: () => renderClusterLayerExample(),
   renderVectorTileLayer: () => renderAvgPriceVectorTileExample(),
@@ -111,7 +111,7 @@ export const mapMethodDemos = {
   clearLayerFeatureStyles: () => clearMixedHighlightExample(),
   focusFeature: () => mapActions.focusFeature(EXAMPLE_MIXED_LAYER_ID, EXAMPLE_FEATURE_IDS.point),
   fitLayerView: () => mapActions.fitLayerView(EXAMPLE_MIXED_LAYER_ID, { padding: [80, 80] }),
-  setViewport: () => mapActions.setViewport({ center: [117.2272, 31.8206], zoom: 11 })
+  setViewport: () => mapActions.setViewport({ center: [121.4737, 31.2304], zoom: 11 })
 }
 
 export const locaMethodDemos = {

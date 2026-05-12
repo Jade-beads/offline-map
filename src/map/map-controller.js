@@ -1,7 +1,9 @@
 import { createClusterLayer } from './cluster-layer-registry'
 import { createLayer } from './layer-registry'
 import { createVectorTileLayer } from './vector-tile-layer-registry'
+import { createWMTSLayer } from './wmts-layer-registry'
 import { createWMSLayer } from './wms-layer-registry'
+import { MessageBox } from 'element-ui'
 
 const DRAW_OPTIONS = {
   fillColor: '#5f97f0',
@@ -129,12 +131,20 @@ function createCustomMarkerContent(name) {
   return `<div class="custom-map-marker" title="${escapeHtml(name)}"><span></span></div>`
 }
 
-function getPromptInput(message, defaultValue) {
-  const promptFn = typeof window !== 'undefined' && typeof window.prompt === 'function'
-    ? window.prompt.bind(window)
-    : (typeof globalThis.prompt === 'function' ? globalThis.prompt.bind(globalThis) : null)
+function normalizeCustomMarkerPosition(marker) {
+  if (!marker) return null
 
-  return promptFn ? promptFn(message, defaultValue) : null
+  const position = Array.isArray(marker.position)
+    ? marker.position
+    : (marker.lng != null && marker.lat != null ? [marker.lng, marker.lat] : null)
+
+  if (!Array.isArray(position) || position.length < 2) return null
+
+  const lng = Number(position[0])
+  const lat = Number(position[1])
+  if (Number.isNaN(lng) || Number.isNaN(lat)) return null
+
+  return [lng, lat]
 }
 
 function getPathFromBounds(bounds) {
@@ -260,6 +270,7 @@ export class MapController {
       'draw:overlay:delete': () => this.deleteDrawOverlay(command.payload),
       'coordinate-picker:start': () => this.prepareCoordinatePicker(),
       'marker:start': () => this.startCustomMarker(),
+      'marker:render': () => this.renderCustomMarkers(command.payload),
       'marker:update-name': () => this.updateCustomMarkerName(command.payload),
       'marker:delete': () => this.deleteCustomMarker(command.payload),
       'marker:save': () => this.saveCustomMarker(command.payload),
@@ -268,6 +279,7 @@ export class MapController {
       'map:center-by-coordinate': () => this.centerByCoordinate(command.payload),
       'cluster:render': () => this.renderClusterLayer(command.payload),
       'wms:render': () => this.renderWMSLayer(command.payload),
+      'wmts:render': () => this.renderWMTSLayer(command.payload),
       'vector-tile:render': () => this.renderVectorTileLayer(command.payload),
       'layer:render': () => this.renderLayer(command.payload),
       'layer:visible': () => this.setLayerVisible(command.payload),
@@ -278,6 +290,7 @@ export class MapController {
       'layer:clear': () => this.clearLayer(command.payload),
       'layers:clear': () => this.clearAllLayers(),
       'layers:clear-by-prefix': () => this.clearLayersByPrefix(command.payload),
+      'layers:clear-except': () => this.clearLayersExcept(command.payload),
       'layer:feature-style': () => this.setFeatureStyle(command.payload),
       'layer:feature-style:clear': () => this.clearFeatureStyle(command.payload),
       'layer:feature-styles:clear': () => this.clearLayerFeatureStyles(command.payload),
@@ -343,6 +356,26 @@ export class MapController {
 
     const layerExists = this.layers.has(payload.layerId)
     const layer = this.getWMSLayer(payload.layerId)
+    layer.setData(payload)
+
+    if (payload.visible === false) {
+      layer.hide()
+      this.syncLayerInfo(payload.layerId, layer)
+      return
+    }
+
+    if (payload.visible === true || !layerExists) {
+      layer.show()
+    }
+
+    this.syncLayerInfo(payload.layerId, layer)
+  }
+
+  renderWMTSLayer(payload = {}) {
+    if (!payload.layerId) return
+
+    const layerExists = this.layers.has(payload.layerId)
+    const layer = this.getWMTSLayer(payload.layerId)
     layer.setData(payload)
 
     if (payload.visible === false) {
@@ -460,6 +493,29 @@ export class MapController {
 
     Array.from(this.layers.keys())
       .filter((layerId) => String(layerId).startsWith(prefix))
+      .forEach((layerId) => {
+        const layer = this.layers.get(layerId)
+        if (layer) {
+          layer.destroy()
+        }
+        this.layers.delete(layerId)
+        this.removeLayerInfo(layerId)
+      })
+  }
+
+  clearLayersExcept(payload = {}) {
+    const layerIds = Array.isArray(payload.layerIds)
+      ? payload.layerIds
+      : [payload.layerId]
+    const keepLayerIds = new Set(
+      layerIds
+        .filter((layerId) => layerId != null && layerId !== '')
+        .map((layerId) => String(layerId))
+    )
+    if (!keepLayerIds.size) return
+
+    Array.from(this.layers.keys())
+      .filter((layerId) => !keepLayerIds.has(String(layerId)))
       .forEach((layerId) => {
         const layer = this.layers.get(layerId)
         if (layer) {
@@ -661,6 +717,7 @@ export class MapController {
       this.activeCustomMarkerId = markerId
       this.bindCustomMarkerContextMenu(record)
       this.syncCustomMarkerResult(record)
+      this.emitCustomMarkerAction('create', record, this.createCustomMarkerResult(record))
       this.clearCustomMarkerHandler()
       if (this.actions.setActiveTool) {
         this.actions.setActiveTool('')
@@ -668,6 +725,102 @@ export class MapController {
     }
 
     this.bindOneMapEvent('click', this.customMarkerHandler)
+  }
+
+  createCustomMarkerRecord(markerData = {}) {
+    const position = normalizeCustomMarkerPosition(markerData)
+    if (!position) return null
+
+    const id = markerData.id == null || markerData.id === ''
+      ? `custom-${Date.now()}-${this.customMarkerSeq += 1}`
+      : String(markerData.id)
+    const name = String(markerData.name || DEFAULT_CUSTOM_MARKER_NAME)
+    const marker = new this.AMap.Marker({
+      position,
+      content: createCustomMarkerContent(name),
+      offset: new this.AMap.Pixel(-12, -24),
+      title: name,
+      label: {
+        content: name,
+        direction: 'bottom'
+      },
+      extData: {
+        id,
+        type: 'custom-marker',
+        name,
+        position
+      }
+    })
+
+    return {
+      id,
+      type: 'custom-marker',
+      name,
+      marker,
+      position,
+      createdAt: markerData.createdAt || Date.now(),
+      updatedAt: markerData.updatedAt || Date.now(),
+      rightClickHandler: null
+    }
+  }
+
+  addCustomMarkerRecord(record) {
+    if (!record || !record.marker) return
+
+    this.updateCustomMarkerVisual(record)
+    this.map.add(record.marker)
+    this.customMarkers.push(record.marker)
+    this.customMarkerRecords.set(record.id, record)
+    this.bindCustomMarkerContextMenu(record)
+  }
+
+  clearCustomMarkerRecords(options = {}) {
+    const records = Array.from(this.customMarkerRecords.values())
+    records.forEach((record) => {
+      this.unbindCustomMarkerContextMenu(record)
+    })
+
+    if (this.customMarkers.length) {
+      detachOverlaysFromMap(this.map, this.customMarkers)
+    }
+
+    this.customMarkers = []
+    this.customMarkerRecords.clear()
+    this.activeCustomMarkerId = ''
+    this.customMarkerContextMenuTargetId = ''
+
+    if (!options.keepResult && this.actions.clearCustomMarkerResult) {
+      this.actions.clearCustomMarkerResult()
+    }
+  }
+
+  renderCustomMarkers(payload = {}) {
+    if (typeof this.AMap.Marker !== 'function') {
+      this.warnToolUnavailable('AMap.Marker')
+      return
+    }
+
+    const markers = Array.isArray(payload) ? payload : payload.markers
+    if (!Array.isArray(markers)) return
+
+    this.clearCustomMarkerHandler()
+    this.clearCustomMarkerRecords({
+      keepResult: true
+    })
+
+    markers.forEach((markerData) => {
+      const record = this.createCustomMarkerRecord(markerData)
+      if (record) {
+        this.addCustomMarkerRecord(record)
+      }
+    })
+
+    const records = Array.from(this.customMarkerRecords.values())
+    this.emitCustomMarkerAction('render', null, null, {
+      ids: records.map((record) => record.id),
+      records: records.map((record) => this.createCustomMarkerResult(record)),
+      markerCount: this.customMarkerRecords.size
+    })
   }
 
   createCustomMarkerResult(record) {
@@ -689,6 +842,19 @@ export class MapController {
     if (!record || !this.actions.setCustomMarkerResult) return
 
     this.actions.setCustomMarkerResult(this.createCustomMarkerResult(record))
+  }
+
+  emitCustomMarkerAction(type, record = null, result = null, extra = {}) {
+    if (!this.actions.setCustomMarkerAction) return
+
+    this.actions.setCustomMarkerAction({
+      type,
+      id: record ? record.id : '',
+      result,
+      markerCount: this.customMarkerRecords.size,
+      timestamp: Date.now(),
+      ...extra
+    })
   }
 
   getCustomMarkerRecord(id) {
@@ -739,12 +905,24 @@ export class MapController {
     const record = this.getCustomMarkerRecord(payload && payload.id)
     if (!record) return
 
-    const rawName = payload && payload.name != null
-      ? payload.name
-      : getPromptInput('请输入锚点名称', record.name)
+    if (payload && payload.name != null) {
+      this.applyCustomMarkerName(record, payload.name)
+      return
+    }
 
-    if (rawName == null) return
+    return MessageBox.prompt('请输入锚点名称', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputValue: record.name,
+      inputPattern: /\S+/,
+      inputErrorMessage: '锚点名称不能为空'
+    }).then(({ value }) => {
+      this.applyCustomMarkerName(record, value)
+    }).catch(() => {})
+  }
 
+  applyCustomMarkerName(record, rawName) {
+    if (!record) return
     const name = String(rawName).trim()
     if (!name) return
 
@@ -753,18 +931,16 @@ export class MapController {
     this.activeCustomMarkerId = record.id
     this.updateCustomMarkerVisual(record)
     this.syncCustomMarkerResult(record)
+    this.emitCustomMarkerAction('update', record, this.createCustomMarkerResult(record))
   }
 
   deleteCustomMarker(payload = {}) {
     const record = this.getCustomMarkerRecord(payload && payload.id)
     if (!record) return
+    const deletedResult = this.createCustomMarkerResult(record)
 
     this.unbindCustomMarkerContextMenu(record)
-    if (typeof this.map.remove === 'function') {
-      this.map.remove(record.marker)
-    } else if (record.marker && typeof record.marker.setMap === 'function') {
-      record.marker.setMap(null)
-    }
+    detachOverlayFromMap(this.map, record.marker)
 
     this.customMarkers = this.customMarkers.filter((marker) => marker !== record.marker)
     this.customMarkerRecords.delete(record.id)
@@ -779,6 +955,7 @@ export class MapController {
     if (this.actions.clearCustomMarkerResult) {
       this.actions.clearCustomMarkerResult()
     }
+    this.emitCustomMarkerAction('delete', record, deletedResult)
   }
 
   saveCustomMarker(payload = {}) {
@@ -791,6 +968,7 @@ export class MapController {
       ...this.createCustomMarkerResult(record),
       requestedAt: Date.now()
     })
+    this.emitCustomMarkerAction('save', record, this.createCustomMarkerResult(record))
   }
 
   openCustomMarkerContextMenu(record, lnglat) {
@@ -864,16 +1042,9 @@ export class MapController {
     })
     this.clearCustomMarkerHandler()
     this.closeContextMenu('customMarkerContextMenu')
-    if (this.customMarkers.length) {
-      this.customMarkerRecords.forEach((record) => {
-        this.unbindCustomMarkerContextMenu(record)
-      })
-      this.map.remove(this.customMarkers)
-      this.customMarkers = []
-    }
-    this.customMarkerRecords.clear()
-    this.activeCustomMarkerId = ''
-    this.customMarkerContextMenuTargetId = ''
+    this.clearCustomMarkerRecords({
+      keepResult: true
+    })
     this.clearAllLayers()
     this.map.destroy()
   }
@@ -919,6 +1090,25 @@ export class MapController {
     }
 
     const layer = createWMSLayer(layerId, {
+      AMap: this.AMap,
+      map: this.map
+    })
+    this.layers.set(layerId, layer)
+
+    return layer
+  }
+
+  getWMTSLayer(layerId) {
+    const existingLayer = this.layers.get(layerId)
+    if (existingLayer && existingLayer.getType && existingLayer.getType() === 'wmts') {
+      return existingLayer
+    }
+
+    if (existingLayer && existingLayer.destroy) {
+      existingLayer.destroy()
+    }
+
+    const layer = createWMTSLayer(layerId, {
       AMap: this.AMap,
       map: this.map
     })

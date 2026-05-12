@@ -27,6 +27,12 @@ function isPlainObject(value) {
   return Object.prototype.toString.call(value) === '[object Object]'
 }
 
+function assertRequiredField(value, method, field) {
+  if (value == null || value === '') {
+    throw new Error(`mapActions.${method}: ${field} 不能为空`)
+  }
+}
+
 function getRenderDefaultProperties(renderParams) {
   const properties = isPlainObject(renderParams.properties)
     ? { ...renderParams.properties }
@@ -39,6 +45,8 @@ function getRenderDefaultProperties(renderParams) {
   return Object.keys(properties).length ? properties : undefined
 }
 
+export const vm = new Vue()
+
 export const mapStore = Vue.observable({
   activeTool: '',
   commandSeq: 0,
@@ -50,8 +58,9 @@ export const mapStore = Vue.observable({
   coordinatePickResult: null,
   customMarkerResult: null,
   customMarkerSaveRequest: null,
+  customMarkerAction: null,
   viewport: {
-    center: [117.2272, 31.8206],
+    center: [121.4737, 31.2304],
     zoom: 11,
     bounds: null
   }
@@ -115,6 +124,14 @@ export const mapActions = {
 
   clearCustomMarkerResult() {
     mapStore.customMarkerResult = null
+  },
+
+  setCustomMarkerAction(action) {
+    mapStore.customMarkerAction = action
+  },
+
+  clearCustomMarkerAction() {
+    mapStore.customMarkerAction = null
   },
 
   setCustomMarkerSaveRequest(request) {
@@ -237,6 +254,12 @@ export const mapActions = {
     })
   },
 
+  renderCustomMarkers(markers = []) {
+    this.dispatchMapCommand('marker:render', {
+      markers
+    })
+  },
+
   zoomIn() {
     this.dispatchMapCommand('zoom:in')
   },
@@ -311,6 +334,21 @@ export const mapActions = {
 
     this.dispatchMapCommand('layers:clear-by-prefix', {
       prefix
+    })
+  },
+
+  clearLayersExcept(layerIds) {
+    const keepLayerIds = Array.isArray(layerIds)
+      ? layerIds
+      : [layerIds]
+    const normalizedLayerIds = keepLayerIds
+      .filter((layerId) => layerId != null && layerId !== '')
+      .map((layerId) => String(layerId))
+
+    if (!normalizedLayerIds.length) return
+
+    this.dispatchMapCommand('layers:clear-except', {
+      layerIds: normalizedLayerIds
     })
   },
 
@@ -424,6 +462,21 @@ export const mapActions = {
     }
 
     this.dispatchMapCommand('wms:render', {
+      ...renderParams,
+      layerId
+    })
+  },
+
+  renderWMTSLayer(params) {
+    const renderParams = typeof params === 'string'
+      ? { layerId: params }
+      : params || {}
+    const layerId = renderParams.layerId
+
+    assertRequiredField(layerId, 'renderWMTSLayer', 'layerId')
+    assertRequiredField(renderParams.url, 'renderWMTSLayer', 'url')
+
+    this.dispatchMapCommand('wmts:render', {
       ...renderParams,
       layerId
     })

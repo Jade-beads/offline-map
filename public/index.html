@@ -5,40 +5,9 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>地图工作台</title>
-    <script>
-      window.AMapConfig = window.AMapConfig || {};
-      window.AMapConfig.logoUrl = window.AMapConfig.logoUrl || '';
-      window.___onAPILoaded = window.___onAPILoaded || function () {};
-      window.addEventListener('unhandledrejection', function (event) {
-        var reason = event && event.reason;
-        var isEmptyReason = reason == null || reason === '';
-        if (!isEmptyReason) return;
-
-        console.warn('[AmapMap] Suppressed empty promise rejection from offline AMap runtime.');
-        event.preventDefault();
-        if (typeof event.stopImmediatePropagation === 'function') {
-          event.stopImmediatePropagation();
-        }
-      }, true);
-      try {
-        Object.keys(window.localStorage || {})
-          .filter(function (key) {
-            return key.indexOf('_AMap_') === 0;
-          })
-          .forEach(function (key) {
-            window.localStorage.removeItem(key);
-          });
-      } catch (error) {
-        console.warn('[AmapMap] Failed to clear cached AMap modules.', error);
-      }
-    </script>
     <script type="text/javascript" src="<%= BASE_URL %>amap/AMap3.js"></script>
-    <script type="text/javascript" src="<%= BASE_URL %>amap/plugin.js"></script>
+    <script type="text/javascript" src="<%= BASE_URL %>amap/mapsplugin.js"></script>
     <script type="text/javascript" src="<%= BASE_URL %>amap/Loca.js"></script>
-    <script type="text/javascript" src="<%= BASE_URL %>amap/mapboxVectorTileLayer.js"></script>
-    <script>
-      AMap.getConfig().key = '6e9454356b041c6e658e8a8b2b160e8c';
-    </script>
   </head>
   <body>
     <noscript>
