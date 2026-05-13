@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1778663318646" clover="3.2.0">
-  <project timestamp="1778663318647" name="All files">
-    <metrics statements="2915" coveredstatements="2077" conditionals="3103" coveredconditionals="1575" methods="796" coveredmethods="588" elements="6814" coveredelements="4240" complexity="0" loc="2915" ncloc="2915" packages="4" files="16" classes="16"/>
+<coverage generated="1778663384533" clover="3.2.0">
+  <project timestamp="1778663384534" name="All files">
+    <metrics statements="2915" coveredstatements="2077" conditionals="3103" coveredconditionals="1575" methods="796" coveredmethods="588" elements="6814" coveredelements="4240" complexity="0" loc="2915" ncloc="2915" packages="4" files="15" classes="15"/>
     <package name="components">
       <metrics statements="50" coveredstatements="37" conditionals="22" coveredconditionals="13" methods="30" coveredmethods="21"/>
       <file name="CustomerHeatmapToolbar.vue" path="D:\code\offline-map\src\components\CustomerHeatmapToolbar.vue">
@@ -2972,9 +2972,6 @@
         <line num="558" count="0" type="stmt"/>
         <line num="561" count="1" type="stmt"/>
         <line num="566" count="0" type="stmt"/>
-      </file>
-      <file name="index.js" path="D:\code\offline-map\src\map-business\index.js">
-        <metrics statements="0" coveredstatements="0" conditionals="0" coveredconditionals="0" methods="0" coveredmethods="0"/>
       </file>
     </package>
   </project>

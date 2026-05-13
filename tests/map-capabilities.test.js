@@ -385,11 +385,14 @@ class FakeMarkerCluster {
       return marker
     })
     this.clusterMarker = new FakeMarker()
-    this.options.renderClusterMarker({
-      count: this.data.length,
+    const clusterMarkerPayload = {
       marker: this.clusterMarker,
-      clusterData: this.data
-    })
+      [FakeMarkerCluster.clusterDataKey]: this.data
+    }
+    if (FakeMarkerCluster.providesClusterCount) {
+      clusterMarkerPayload.count = this.data.length
+    }
+    this.options.renderClusterMarker(clusterMarkerPayload)
   }
 
   setData(data) {
@@ -410,6 +413,8 @@ class FakeMarkerCluster {
   }
 }
 FakeMarkerCluster.instances = []
+FakeMarkerCluster.providesClusterCount = true
+FakeMarkerCluster.clusterDataKey = 'clusterData'
 
 class FakeWMSLayer {
   constructor(options = {}) {
@@ -991,6 +996,22 @@ describe('cluster layer helpers', () => {
     expect(FakeMarkerCluster.instances[FakeMarkerCluster.instances.length - 1].map).toBe(map)
   })
 
+  test('uses project theme color as default cluster style', () => {
+    FakeMarkerCluster.instances = []
+    const layer = createClusterLayer('bank-cluster-default-theme', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    layer.setData(createBankPointGeoJSON(bankRecords))
+    layer.show()
+
+    const info = layer.getInfo()
+    expect(info.styleSnapshot.point.color).toBe('#B6002A')
+    expect(info.styleSnapshot.cluster.color).toBe('#B6002A')
+    expect(FakeMarkerCluster.instances[0].clusterMarker.content).toContain('#B6002A')
+  })
+
   test('supports custom svg/html cluster marker content', () => {
     FakeMarkerCluster.instances = []
     const AMap = createFakeAMap()
@@ -1030,6 +1051,70 @@ describe('cluster layer helpers', () => {
     const imageClusterMarker = FakeMarkerCluster.instances[FakeMarkerCluster.instances.length - 1].clusterMarker
     expect(imageClusterMarker.content).toContain('img src="http://localhost/cluster.svg"')
     expect(imageClusterMarker.content).toContain('<span>2+</span>')
+  })
+
+  test('applies point label options to cluster point markers', () => {
+    FakeMarkerCluster.instances = []
+    const layer = createClusterLayer('bank-cluster-point-label', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    layer.setData(createBankPointGeoJSON(bankRecords), {
+      point: {
+        label: {
+          visible: true,
+          field: 'name',
+          direction: 'right',
+          offset: [8, -22]
+        }
+      }
+    })
+
+    const marker = FakeMarkerCluster.instances[0].markers[0]
+    expect(marker.label.content).toBe(bankRecords[0].name)
+    expect(marker.label.direction).toBe('right')
+    expect(marker.label.offset.x).toBe(8)
+    expect(marker.label.offset.y).toBe(-22)
+
+    layer.patchStyle({
+      point: {
+        label: {
+          visible: true,
+          content: '固定文本',
+          field: 'name'
+        }
+      }
+    })
+
+    const patchedMarker = FakeMarkerCluster.instances[FakeMarkerCluster.instances.length - 1].markers[0]
+    expect(patchedMarker.label.content).toBe('固定文本')
+  })
+
+  test('derives custom cluster count from cluster data when callback count is missing', () => {
+    FakeMarkerCluster.instances = []
+    FakeMarkerCluster.providesClusterCount = false
+    FakeMarkerCluster.clusterDataKey = 'data'
+    const layer = createClusterLayer('bank-cluster-derived-count', {
+      AMap: createFakeAMap(),
+      map: createFakeMap()
+    })
+
+    try {
+      layer.setData(createBankPointGeoJSON(bankRecords), {
+        cluster: {
+          renderer: 'html',
+          html: ({ count }) => `<strong>${count}</strong>`
+        }
+      })
+
+      const clusterMarker = FakeMarkerCluster.instances[0].clusterMarker
+      expect(clusterMarker.content).toContain('<strong>2</strong>')
+      expect(clusterMarker.extData.count).toBe(2)
+    } finally {
+      FakeMarkerCluster.providesClusterCount = true
+      FakeMarkerCluster.clusterDataKey = 'clusterData'
+    }
   })
 })
 

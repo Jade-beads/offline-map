@@ -1,5 +1,9 @@
 import { mapActions } from '../map/map-store'
 
+const DEFAULT_ICON_MAP = {
+  默认: '/logo/default-bank.png'
+}
+
 export const BANK_POINT_LAYER_ID = 'business-bank-points'
 export const BANK_RADIUS_LAYER_ID = 'business-bank-radius'
 

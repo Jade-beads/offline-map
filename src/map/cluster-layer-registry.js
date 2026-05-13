@@ -9,6 +9,7 @@ import {
 } from './style-resolver'
 
 const GEOMETRY_TYPES = ['Point', 'MultiPoint']
+const CLUSTER_THEME_COLOR = '#B6002A'
 
 const DEFAULT_CLUSTER_STYLE = {
   gridSize: 80,
@@ -17,13 +18,13 @@ const DEFAULT_CLUSTER_STYLE = {
   averageCenter: true,
   point: {
     renderer: 'pin',
-    color: '#1677ff',
+    color: CLUSTER_THEME_COLOR,
     size: [30, 30],
     zIndex: 90,
     textField: 'shortName'
   },
   cluster: {
-    color: '#1677ff',
+    color: CLUSTER_THEME_COLOR,
     textColor: '#ffffff',
     borderColor: '#ffffff',
     size: [44, 44],
@@ -324,7 +325,7 @@ function createPinContent(item, style, size) {
   const textField = style.textField || style.labelField || 'category'
   const rawText = style.text != null ? style.text : getPropertyValue(properties, textField)
   const text = rawText == null || rawText === '' ? ' ' : String(rawText).slice(0, style.textLength || 1)
-  const color = style.color || style.fillColor || '#1677ff'
+  const color = style.color || style.fillColor || CLUSTER_THEME_COLOR
   const fontSize = toNumber(style.fontSize, Math.max(11, Math.round(size[0] * 0.46)))
 
   return `
@@ -335,6 +336,24 @@ function createPinContent(item, style, size) {
       <span>${text}</span>
     </div>
   `
+}
+
+function createPointLabel(AMap, item, style) {
+  const label = style.label
+  if (!label || label.visible === false) return null
+
+  const properties = item.properties || {}
+  const content = label.content != null
+    ? label.content
+    : getPropertyValue(properties, label.field)
+
+  if (content == null || content === '') return null
+
+  return {
+    content: String(content),
+    direction: label.direction || 'right',
+    offset: createPixel(AMap, label.offset)
+  }
 }
 
 function getResolvedPointStyle(layerStyle, item) {
@@ -376,6 +395,11 @@ function renderPointMarker(AMap, marker, item, layerStyle, events, layerId) {
     marker.setContent(createPinContent(item, style, size))
   }
 
+  const label = createPointLabel(AMap, item, style)
+  if (typeof marker.setLabel === 'function') {
+    marker.setLabel(label)
+  }
+
   if (typeof marker.on === 'function' && events && typeof events.click === 'function') {
     marker.on('click', (rawEvent) => {
       events.click(item.feature, {
@@ -403,7 +427,7 @@ function renderClusterMarker(AMap, marker, count, clusterData, layerStyle) {
     ? Math.min(72, baseSize[0] + Math.max(0, String(count).length - 2) * 8)
     : baseSize[0]
   const size = useDefaultRenderer ? [sizeValue, sizeValue] : baseSize
-  const color = style.color || '#1677ff'
+  const color = style.color || CLUSTER_THEME_COLOR
   const textColor = style.textColor || '#ffffff'
   const borderColor = style.borderColor || '#ffffff'
   const context = {
@@ -478,6 +502,17 @@ function getVisibleClusterData(clusterData, hiddenCategories, hiddenFeatureIds) 
   })
 }
 
+function getClusterItems(clusterContext) {
+  if (Array.isArray(clusterContext.clusterData)) return clusterContext.clusterData
+  if (Array.isArray(clusterContext.data)) return clusterContext.data
+  return []
+}
+
+function getClusterCount(count, clusterData) {
+  if (Number.isFinite(count)) return count
+  return clusterData.length
+}
+
 function makeClusterLayer(layerId, context) {
   const { AMap, map } = context
   let features = []
@@ -519,7 +554,11 @@ function makeClusterLayer(layerId, context) {
         const item = Array.isArray(data) ? data[0] : data
         renderPointMarker(AMap, marker, item, layerStyle, events, layerId)
       },
-      renderClusterMarker({ marker, count, clusterData: items }) {
+      renderClusterMarker(clusterContext = {}) {
+        const items = getClusterItems(clusterContext)
+        const count = getClusterCount(clusterContext.count, items)
+        const marker = clusterContext.marker
+
         renderClusterMarker(AMap, marker, count, items, layerStyle)
       }
     }
