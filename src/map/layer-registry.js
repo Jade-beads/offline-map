@@ -667,7 +667,7 @@ function createOfficialHeatmap(AMap, map, style, visible) {
         return heatmap
       }
     } catch (error) {
-      // Try the next constructor signature; offline packages can differ by JSAPI build.
+      // 不同 JSAPI 版本的构造参数存在差异，失败后尝试下一种签名。
     }
   }
 
@@ -860,20 +860,25 @@ function getVisibleFeatures(features, hiddenCategories, hiddenFeatureIds) {
 }
 
 function createFeatureIndex(features) {
-  return features.reduce((result, feature) => {
+  const index = features.reduce((result, feature) => {
     const key = getFeatureStyleKey(feature)
     if (!key) return result
 
-    result[key] = {
+    // Object.freeze 阻止 Vue 2 对 entry 做深度响应式化，
+    // 避免通过 properties 引用反向污染原始 feature 对象，
+    // 消除 AMap 渲染循环每帧触发大量 reactive getter 的开销
+    result[key] = Object.freeze({
       id: getFeatureId(feature),
       name: getFeatureName(feature),
       category: getFeatureCategory(feature),
       geometryKind: getGeometryKind(feature),
       properties: getFeatureProperties(feature)
-    }
+    })
 
     return result
   }, {})
+
+  return Object.freeze(index)
 }
 
 function makeGeoJSONLayer(layerId, context) {
@@ -1119,7 +1124,7 @@ function makeGeoJSONLayer(layerId, context) {
         if (heatmap) {
           refreshHeatmap()
         } else {
-          console.warn('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
+          console.warn('[AmapMap] AMap.HeatMap is unavailable in the current AMap SDK.')
         }
 
         return
@@ -1178,7 +1183,7 @@ function makeGeoJSONLayer(layerId, context) {
         if (heatmap) {
           refreshHeatmap()
         } else {
-          console.warn('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
+          console.warn('[AmapMap] AMap.HeatMap is unavailable in the current AMap SDK.')
         }
 
         return
@@ -1199,7 +1204,7 @@ function makeGeoJSONLayer(layerId, context) {
         if (heatmap) {
           refreshHeatmap()
         } else {
-          console.warn('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
+          console.warn('[AmapMap] AMap.HeatMap is unavailable in the current AMap SDK.')
         }
 
         return

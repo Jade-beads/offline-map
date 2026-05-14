@@ -1,16 +1,15 @@
 module.exports = {
   testEnvironment: 'jsdom',
   testMatch: [
-    '<rootDir>/test/**/*.test.js',
-    '<rootDir>/tests/**/*.test.js',
-    '<rootDir>/tests/unit/**/*.spec.js'
+    '<rootDir>/tests/unit/**/*.spec.js',
+    '<rootDir>/tests/unit/**/*.spec.jsx',
+    '<rootDir>/tests/unit/**/*.spec.ts',
+    '<rootDir>/tests/unit/**/*.spec.tsx',
+    '<rootDir>/**/__tests__/**/*.[jt]s?(x)'
   ],
   transform: {
     '^.+\\.js$': 'babel-jest',
     '^.+\\.vue$': '<rootDir>/test/vue-sfc-script-transformer.js'
-  },
-  moduleNameMapper: {
-    '^bun:test$': '<rootDir>/test/jest-bun-test-shim.js'
   },
   collectCoverageFrom: [
     'src/map/**/*.js',

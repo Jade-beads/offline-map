@@ -1,4 +1,3 @@
-import { describe, expect, test } from 'bun:test'
 import { MessageBox } from 'element-ui'
 import {
   BUSINESS_POI_CLUSTER_LAYER_ID,
@@ -11,21 +10,21 @@ import {
   createPoiPointGeoJSON,
   renderPoiClusterOrDistrictCount,
   renderDistrictCountPoints
-} from '../src/map-business'
-import { createClusterData, createClusterLayer, getClusterFeatures } from '../src/map/cluster-layer-registry'
-import { createLayer } from '../src/map/layer-registry'
-import { MapController } from '../src/map/map-controller'
-import { mapActions, mapStore } from '../src/map/map-store'
-import { resolveFeatureStyle } from '../src/map/style-resolver'
-import { createVectorTileLayer } from '../src/map/vector-tile-layer-registry'
-import { createWMSLayer } from '../src/map/wms-layer-registry'
-import { createLocaLayer } from '../src/loca/loca-layer-registry'
-import { locaActions, locaStore } from '../src/loca/loca-store'
+} from '../../../../../src/map-business'
+import { createClusterData, createClusterLayer, getClusterFeatures } from '../../../../../src/map/cluster-layer-registry'
+import { createLayer } from '../../../../../src/map/layer-registry'
+import { MapController } from '../../../../../src/map/map-controller'
+import { mapActions, mapStore } from '../../../../../src/map/map-store'
+import { resolveFeatureStyle } from '../../../../../src/map/style-resolver'
+import { createVectorTileLayer } from '../../../../../src/map/vector-tile-layer-registry'
+import { createWMSLayer } from '../../../../../src/map/wms-layer-registry'
+import { createLocaLayer } from '../../../../../src/loca/loca-layer-registry'
+import { locaActions, locaStore } from '../../../../../src/loca/loca-store'
 import {
   MV_GRID_THINNING_LAYER_ID,
   MV_GRID_THINNING_URL,
   renderMvGridThinningVectorTileExample
-} from '../src/examples/vector-tile-feature-examples'
+} from '../../../../../src/examples/vector-tile-feature-examples'
 
 const bankRecords = [
   {

@@ -237,7 +237,7 @@ export function createVectorTileLayer(layerId, context) {
   function createLayerInstance() {
     const VectorTileLayer = getVectorTileConstructor(AMap)
     if (!VectorTileLayer) {
-      console.warn('[AmapMap] AMap.MapboxVectorTileLayer is unavailable in the offline package.')
+      console.warn('[AmapMap] AMap.MapboxVectorTileLayer is unavailable in the current AMap SDK.')
       return null
     }
 

@@ -1631,7 +1631,7 @@ export class MapController {
   }
 
   warnToolUnavailable(pluginName) {
-    console.warn(`[AmapMap] ${pluginName} is unavailable in the offline package.`)
+    console.warn(`[AmapMap] ${pluginName} is unavailable in the current AMap SDK.`)
     if (this.actions.setActiveTool) {
       this.actions.setActiveTool('')
     }

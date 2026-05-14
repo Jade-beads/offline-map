@@ -1,6 +1,6 @@
-import { createClusterData, getClusterFeatures } from '../src/map/cluster-layer-registry'
-import { createLayer } from '../src/map/layer-registry'
-import { mapActions, mapStore } from '../src/map/map-store'
+import { createClusterData, getClusterFeatures } from '../../../../../src/map/cluster-layer-registry'
+import { createLayer } from '../../../../../src/map/layer-registry'
+import { mapActions, mapStore } from '../../../../../src/map/map-store'
 import {
   getFeatureCategory,
   getFeatureId,
@@ -13,10 +13,10 @@ import {
   resolveFeatureStyle,
   resolveHeatmapStyle,
   resolveScaleValue
-} from '../src/map/style-resolver'
-import { createVectorTileLayer } from '../src/map/vector-tile-layer-registry'
-import { buildWMTSTileUrl, createWMTSLayer } from '../src/map/wmts-layer-registry'
-import { createWMSLayer } from '../src/map/wms-layer-registry'
+} from '../../../../../src/map/style-resolver'
+import { createVectorTileLayer } from '../../../../../src/map/vector-tile-layer-registry'
+import { buildWMTSTileUrl, createWMTSLayer } from '../../../../../src/map/wmts-layer-registry'
+import { createWMSLayer } from '../../../../../src/map/wms-layer-registry'
 
 const pointFeature = {
   type: 'Feature',

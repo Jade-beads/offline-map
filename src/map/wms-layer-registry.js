@@ -114,7 +114,7 @@ export function createWMSLayer(layerId, context) {
   function createLayerInstance() {
     const WMSLayer = getWMSConstructor(AMap)
     if (!WMSLayer) {
-      console.warn('[AmapMap] AMap.TileLayer.WMS is unavailable in the offline package.')
+      console.warn('[AmapMap] AMap.TileLayer.WMS is unavailable in the current AMap SDK.')
       return null
     }
 

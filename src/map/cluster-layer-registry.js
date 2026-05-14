@@ -477,20 +477,22 @@ function renderClusterMarker(AMap, marker, count, clusterData, layerStyle) {
 }
 
 function createFeatureIndex(features) {
-  return features.reduce((result, feature) => {
+  const index = features.reduce((result, feature) => {
     const key = getFeatureStyleKey(feature)
     if (!key) return result
 
-    result[key] = {
+    result[key] = Object.freeze({
       id: getFeatureId(feature),
       name: getFeatureName(feature),
       category: getFeatureCategory(feature),
       geometryKind: 'point',
       properties: getFeatureProperties(feature)
-    }
+    })
 
     return result
   }, {})
+
+  return Object.freeze(index)
 }
 
 function getVisibleClusterData(clusterData, hiddenCategories, hiddenFeatureIds) {
@@ -540,7 +542,7 @@ function makeClusterLayer(layerId, context) {
 
     const Cluster = getClusterConstructor()
     if (typeof Cluster !== 'function') {
-      console.warn('[AmapMap] AMap.MarkerCluster is unavailable in the offline package.')
+      console.warn('[AmapMap] AMap.MarkerCluster is unavailable in the current AMap SDK.')
       return
     }
 

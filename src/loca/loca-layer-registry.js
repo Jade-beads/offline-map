@@ -201,7 +201,7 @@ function getLocaLayerConstructor(Loca, type) {
   const LayerConstructor = Loca[constructorName]
 
   if (typeof LayerConstructor !== 'function') {
-    console.warn(`[Loca] ${constructorName} is unavailable in the offline package.`)
+    console.warn(`[Loca] ${constructorName} is unavailable in the current Loca SDK.`)
     return null
   }
 
@@ -478,20 +478,22 @@ function applyRuntimeLayerOptions(targetLayer, options = {}, keys = []) {
 }
 
 function createFeatureIndex(features) {
-  return features.reduce((result, feature) => {
+  const index = features.reduce((result, feature) => {
     const key = getFeatureStyleKey(feature)
     if (!key) return result
 
-    result[key] = {
+    result[key] = Object.freeze({
       id: getFeatureId(feature),
       name: getFeatureName(feature),
       category: getFeatureCategory(feature),
       geometryKind: getGeometryKind(feature),
       properties: getFeatureProperties(feature)
-    }
+    })
 
     return result
   }, {})
+
+  return Object.freeze(index)
 }
 
 function hasFeatureStyle(style) {
@@ -688,7 +690,7 @@ export function createLocaLayer(layerId, context) {
     clearLocaLayer()
 
     if (typeof Loca.GeoJSONSource !== 'function') {
-      console.warn('[Loca] GeoJSONSource is unavailable in the offline package.')
+      console.warn('[Loca] GeoJSONSource is unavailable in the current Loca SDK.')
       return
     }
 
@@ -892,7 +894,7 @@ export function createLocaLayer(layerId, context) {
         hiddenFeatureIds: Array.from(hiddenFeatureIds),
         styledFeatureIds: Array.from(featureStyleOverrides.keys()),
         geometryKinds: getLayerGeometryKinds(features),
-        style: visualStyle,
+        style: mergeStyle({}, visualStyle),
         styleSnapshot: mergeStyle({}, visualStyle),
         layerOptions: mergeStyle({}, layerOptions),
         featureIndex: createFeatureIndex(features)

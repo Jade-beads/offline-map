@@ -1,8 +1,11 @@
 node_modules/
 dist/
+coverage/
+coverage-codex/
 .env.local
 *.log
 *.zip
 .idea/
 .claude/
+.deepseek/
 .chrome-functional-check/
