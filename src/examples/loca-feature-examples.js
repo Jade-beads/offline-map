@@ -80,7 +80,7 @@ export function renderLocaHeatmapExample() {
     visible: true,
     layerOptions: {
       zIndex: 8,
-      opacity: 0.86
+      opacity: 1
     },
     style: {
       radius: 32,

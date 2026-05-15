@@ -4,12 +4,9 @@ const DEFAULT_STYLES = {
   point: {
     renderer: 'pin',
     bubble: true,
-    color: '#2a72d4',
+    color: '#1F2D3D',
     size: 28,
-    zIndex: 20,
-    label: {
-      visible: false
-    }
+    zIndex: 20
   },
   line: {
     bubble: true,

@@ -5,12 +5,10 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>地图工作台</title>
-    <!-- 高德 JSAPI 由 script 标签注入，业务代码只读取 window.AMap / window.Loca。 -->
-    <script src="https://webapi.amap.com/maps?v=2.0&key=6e9454356b041c6e658e8a8b2b160e8c&plugin=AMap.MouseTool,AMap.RangingTool,AMap.CircleEditor,AMap.PolygonEditor,AMap.PolylineEditor,AMap.RectangleEditor,AMap.HeatMap,AMap.MarkerCluster,AMap.MapboxVectorTileLayer"></script>
-    <script src="https://webapi.amap.com/loca?v=2.0.0&key=6e9454356b041c6e658e8a8b2b160e8c"></script>
-<!--    <script type="text/javascript" src="<%= BASE_URL %>amap/AMap3.js"></script>-->
-<!--    <script type="text/javascript" src="<%= BASE_URL %>amap/mapsplugin.js"></script>-->
-<!--    <script type="text/javascript" src="<%= BASE_URL %>amap/Loca.js"></script>-->
+    <script type="text/javascript" src="<%= BASE_URL %>amap/AMap3.js"></script>
+    <script type="text/javascript" src="<%= BASE_URL %>amap/mapsplugin.js"></script>
+    <script type="text/javascript" src="<%= BASE_URL %>amap/render.js"></script>
+    <script type="text/javascript" src="<%= BASE_URL %>amap/Loca.js"></script>
   </head>
   <body>
     <noscript>

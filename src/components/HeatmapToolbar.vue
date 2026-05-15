@@ -1,6 +1,13 @@
 <template>
   <section class="heatmap-toolbar">
-    <div class="toolbar-title">{{ title }}</div>
+    <header class="toolbar-header">
+      <div class="toolbar-title">{{ title }}</div>
+      <el-switch
+        v-model="localVisible"
+        class="visibility-switch"
+        @change="handleVisibleChange"
+      />
+    </header>
 
     <div class="legend-row">
       <span class="legend-edge">{{ lowLabel }}</span>
@@ -19,29 +26,27 @@
       <span class="legend-edge">{{ highLabel }}</span>
     </div>
 
-    <div class="setting-row">
-      <span class="setting-name">热力设置</span>
-      <span class="setting-label">显示</span>
-      <el-switch
-        v-model="localVisible"
-        class="visibility-switch"
-        @change="handleVisibleChange"
+    <div class="opacity-row">
+      <span class="setting-label">透明度</span>
+      <el-input-number
+        v-model="localOpacity"
+        :min="minOpacity"
+        :max="maxOpacity"
+        :step="step"
+        size="small"
+        controls-position="right"
+        class="opacity-input"
+        @change="updateOpacity"
       />
-      <span class="setting-label opacity-label">热力程度</span>
-      <el-button
-        class="step-button"
-        type="primary"
-        size="mini"
-        icon="el-icon-minus"
-        @click="decreaseOpacity"
-      />
-      <span class="opacity-value">{{ localOpacity }}%</span>
-      <el-button
-        class="step-button"
-        type="primary"
-        size="mini"
-        icon="el-icon-plus"
-        @click="increaseOpacity"
+      <span class="opacity-unit">%</span>
+      <el-slider
+        v-model="localOpacity"
+        :min="minOpacity"
+        :max="maxOpacity"
+        :step="step"
+        :show-tooltip="false"
+        class="opacity-slider"
+        @change="updateOpacity"
       />
     </div>
   </section>
@@ -65,6 +70,42 @@ function clamp(value, min, max) {
 function normalizePercent(value, fallback) {
   const numberValue = Number(value)
   return Number.isFinite(numberValue) ? numberValue : fallback
+}
+
+function toPercent(value) {
+  const numberValue = Number(value)
+  if (!Number.isFinite(numberValue)) return null
+
+  return numberValue <= 1 ? Math.round(numberValue * 100) : Math.round(numberValue)
+}
+
+function getHeatmapOpacity(styleSnapshot) {
+  const heatmapStyle = styleSnapshot && styleSnapshot.heatmap
+  const opacity = heatmapStyle && heatmapStyle.opacity
+  if (Array.isArray(opacity)) {
+    return opacity.length ? opacity[opacity.length - 1] : null
+  }
+
+  return opacity
+}
+
+function getLayerOpacity(info, mode) {
+  if (!info) return null
+
+  if (mode === 'map') {
+    const heatmapOpacity = getHeatmapOpacity(info.styleSnapshot)
+    return toPercent(heatmapOpacity == null ? info.opacity : heatmapOpacity)
+  }
+
+  const layerOptionsOpacity = info.layerOptions && info.layerOptions.opacity
+  if (layerOptionsOpacity != null) return toPercent(layerOptionsOpacity)
+  if (info.opacity != null) return toPercent(info.opacity)
+
+  const heatmapOpacity = getHeatmapOpacity(info.styleSnapshot)
+  if (heatmapOpacity != null) return toPercent(heatmapOpacity)
+
+  const styleOpacity = info.style && info.style.opacity
+  return toPercent(styleOpacity)
 }
 
 export default {
@@ -100,7 +141,7 @@ export default {
     },
     step: {
       type: Number,
-      default: 10
+      default: 5
     },
     lowLabel: {
       type: String,
@@ -142,9 +183,15 @@ export default {
     },
     actionApi() {
       return this.mode === 'map' ? mapActions : locaActions
+    },
+    layerInfo() {
+      return this.actionApi.getLayerInfo(this.layerId)
     }
   },
   watch: {
+    layerInfo() {
+      this.syncLayerState()
+    },
     visible(nextVisible) {
       this.localVisible = nextVisible
     },
@@ -153,19 +200,25 @@ export default {
     }
   },
   mounted() {
-    this.applyOpacity()
-    this.handleVisibleChange(this.localVisible)
+    this.syncLayerState()
   },
   methods: {
+    syncLayerState() {
+      const info = this.layerInfo
+      if (!info) return
+
+      if (typeof info.visible === 'boolean') {
+        this.localVisible = info.visible
+      }
+
+      const opacity = getLayerOpacity(info, this.mode)
+      if (opacity != null) {
+        this.localOpacity = clamp(opacity, this.minOpacity, this.maxOpacity)
+      }
+    },
     handleVisibleChange(visible) {
       this.actionApi.setLayerVisible(this.layerId, visible)
       this.$emit('visible-change', visible)
-    },
-    increaseOpacity() {
-      this.updateOpacity(this.localOpacity + this.step)
-    },
-    decreaseOpacity() {
-      this.updateOpacity(this.localOpacity - this.step)
     },
     updateOpacity(value) {
       this.localOpacity = clamp(value, this.minOpacity, this.maxOpacity)
@@ -200,9 +253,9 @@ export default {
   left: 380px;
   bottom: 16px;
   z-index: 16;
-  width: min(720px, calc(100vw - 420px));
-  min-width: 520px;
-  padding: 14px 18px 16px;
+  width: min(520px, calc(100vw - 420px));
+  min-width: 420px;
+  padding: 12px 14px 14px;
   border: 1px solid rgba(205, 215, 229, 0.78);
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.94);
@@ -210,29 +263,35 @@ export default {
   color: #334155;
 }
 
+.toolbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
 .toolbar-title {
   display: inline-flex;
   align-items: center;
-  height: 28px;
-  margin-bottom: 14px;
-  color: #2563eb;
-  font-size: 18px;
+  height: 24px;
+  color: #B6002A;
+  font-size: 15px;
   font-weight: 600;
-  border-bottom: 3px solid #2563eb;
 }
 
 .legend-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  grid-template-columns: 24px minmax(0, 1fr) 24px;
   align-items: start;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .legend-edge {
-  padding-top: 21px;
+  padding-top: 17px;
   color: #475569;
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -241,7 +300,7 @@ export default {
 }
 
 .legend-gradient {
-  height: 16px;
+  height: 12px;
   border-radius: 3px;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
@@ -250,9 +309,9 @@ export default {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 9px;
+  margin-top: 7px;
   color: #475569;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .legend-label {
@@ -261,19 +320,12 @@ export default {
   white-space: nowrap;
 }
 
-.setting-row {
-  display: flex;
+.opacity-row {
+  display: grid;
+  grid-template-columns: auto 104px 18px minmax(120px, 1fr);
   align-items: center;
-  gap: 14px;
-  min-height: 34px;
-}
-
-.setting-name {
-  margin-right: 18px;
-  color: #475569;
-  font-size: 16px;
-  font-weight: 600;
-  white-space: nowrap;
+  gap: 10px;
+  min-height: 32px;
 }
 
 .setting-label {
@@ -283,25 +335,20 @@ export default {
 }
 
 .visibility-switch {
-  margin-right: 34px;
+  flex: 0 0 auto;
 }
 
-.opacity-label {
-  margin-left: auto;
+.opacity-input {
+  width: 104px;
 }
 
-.step-button {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border-radius: 5px;
-}
-
-.opacity-value {
-  width: 44px;
-  text-align: center;
+.opacity-unit {
   color: #475569;
-  font-size: 15px;
+  font-size: 13px;
+}
+
+.opacity-slider {
+  min-width: 120px;
 }
 
 @media (max-width: 980px) {
@@ -313,12 +360,12 @@ export default {
     min-width: 0;
   }
 
-  .setting-row {
-    flex-wrap: wrap;
+  .opacity-row {
+    grid-template-columns: auto 104px 18px;
   }
 
-  .opacity-label {
-    margin-left: 0;
+  .opacity-slider {
+    grid-column: 1 / -1;
   }
 }
 </style>

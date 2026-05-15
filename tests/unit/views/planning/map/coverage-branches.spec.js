@@ -812,7 +812,7 @@ describe('mapActions branch coverage', () => {
     expect(mapStore.viewport.zoom).toBe(12)
     expect(mapStore.commandQueue.map((command) => command.type)).toContain('marker:render')
     expect(mapStore.commandQueue.map((command) => command.type)).toContain('layers:clear-except')
-    expect(mapStore.commandQueue.find((command) => command.type === 'layer:feature-style').payload.style.point.color).toBe('#f59e0b')
+    expect(mapStore.commandQueue.find((command) => command.type === 'layer:feature-style').payload.style.point.color).toBe('#D21F3E')
   })
 })
 
@@ -1624,7 +1624,7 @@ describe('layer registry branch coverage', () => {
       type: 'point'
     })
     noSourceLayer.setData(pointFeature, { color: '#B6002A' })
-    expect(warn).toHaveBeenCalledWith('[Loca] GeoJSONSource is unavailable in the current Loca SDK.')
+    expect(warn).toHaveBeenCalledWith('[Loca] GeoJSONSource is unavailable in the offline package.')
 
     const noConstructorLayer = createLocaLayer('no-constructor', {
       Loca: {
@@ -2401,7 +2401,7 @@ describe('layer registry branch coverage', () => {
     missingHeatmapLayer.setData(pointFeature, {
       renderer: 'heatmap'
     })
-    expect(warn).toHaveBeenCalledWith('[AmapMap] AMap.HeatMap is unavailable in the current AMap SDK.')
+    expect(warn).toHaveBeenCalledWith('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
 
     warn.mockRestore()
   })
@@ -2414,6 +2414,13 @@ describe('toolbar branch coverage', () => {
   })
 
   test('HeatmapToolbar covers watcher, single stop, empty stop and mounted paths', () => {
+    locaActions.setLayerInfo('heat-a', {
+      visible: false,
+      layerOptions: {
+        opacity: 0.56
+      }
+    })
+
     const toolbar = createToolbarContext(HeatmapToolbar, {
       layerId: 'heat-a',
       mode: 'loca',
@@ -2428,6 +2435,10 @@ describe('toolbar branch coverage', () => {
     expect(toolbar.localOpacity).toBe(80)
     expect(toolbar.gradientCss).toContain('#B6002A 100%')
 
+    HeatmapToolbar.mounted.call(toolbar)
+    expect(toolbar.localVisible).toBe(false)
+    expect(toolbar.localOpacity).toBe(56)
+
     HeatmapToolbar.watch.visible.call(toolbar, true)
     HeatmapToolbar.watch.opacity.call(toolbar, 999)
     expect(toolbar.localVisible).toBe(true)
@@ -2436,12 +2447,12 @@ describe('toolbar branch coverage', () => {
     toolbar.stops = []
     expect(toolbar.gradientCss).toBe('')
 
-    HeatmapToolbar.mounted.call(toolbar)
-    toolbar.increaseOpacity()
-    toolbar.decreaseOpacity()
+    toolbar.updateOpacity(toolbar.localOpacity + toolbar.step)
+    toolbar.updateOpacity(toolbar.localOpacity - toolbar.step)
 
     expect(locaStore.commandQueue.map((command) => command.type)).toContain('loca:layer:style:patch')
-    expect(toolbar.$emit).toHaveBeenCalledWith('visible-change', true)
+    expect(toolbar.$emit).toHaveBeenCalledWith('opacity-change', 90)
+    expect(toolbar.$emit).toHaveBeenCalledWith('opacity-change', 65)
   })
 
   test('CustomerHeatmapToolbar covers map mode, watchers and mounted paths', () => {

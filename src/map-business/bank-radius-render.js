@@ -1,4 +1,5 @@
 import { mapActions } from '../map/map-store'
+import { createToggleHighlight } from '../map/layer-helpers'
 
 const DEFAULT_ICON_MAP = {
   默认: '/logo/default-bank.png'
@@ -94,7 +95,9 @@ export function renderBankPointsWithChinaBankRadius(records = [], options = {}) 
     pointLayerId = BANK_POINT_LAYER_ID,
     radiusLayerId = BANK_RADIUS_LAYER_ID,
     radius = 800,
-    fitView = true
+    fitView = true,
+    onSelect,
+    onDeselect
   } = options
 
   const bankGeoJSON = createBankPointGeoJSON(records)
@@ -123,6 +126,18 @@ export function renderBankPointsWithChinaBankRadius(records = [], options = {}) 
     }
   }, radiusGeoJSON)
 
+  const highlightStyle = {
+    point: {
+      size: [42, 42],
+      image: {
+        size: [42, 42],
+        imageSize: [42, 42],
+        src: ({ properties }) => iconMap[properties.bankType] || iconMap[properties.category] || iconMap.默认
+      },
+      zIndex: 150
+    }
+  }
+
   mapActions.renderGeoJSONLayer({
     layerId: pointLayerId,
     visible: true,
@@ -148,7 +163,8 @@ export function renderBankPointsWithChinaBankRadius(records = [], options = {}) 
         },
         zIndex: 120
       }
-    }
+    },
+    ...createToggleHighlight(pointLayerId, highlightStyle, { onSelect, onDeselect })
   }, bankGeoJSON)
 
   if (fitView) {

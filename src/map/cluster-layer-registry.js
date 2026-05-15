@@ -542,7 +542,7 @@ function makeClusterLayer(layerId, context) {
 
     const Cluster = getClusterConstructor()
     if (typeof Cluster !== 'function') {
-      console.warn('[AmapMap] AMap.MarkerCluster is unavailable in the current AMap SDK.')
+      console.warn('[AmapMap] AMap.MarkerCluster is unavailable in the offline package.')
       return
     }
 

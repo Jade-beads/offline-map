@@ -466,6 +466,15 @@ beforeEach(() => {
 
 describe('组件工具条脚本逻辑', () => {
   test('HeatmapToolbar 按 map 模式派发显隐和透明度 patch', () => {
+    mapActions.setLayerInfo('map-heat', {
+      visible: true,
+      styleSnapshot: {
+        heatmap: {
+          opacity: [0.2, 0.64]
+        }
+      }
+    })
+
     const toolbar = createToolbarContext(HeatmapToolbar, {
       layerId: 'map-heat',
       mode: 'map',
@@ -481,18 +490,20 @@ describe('组件工具条脚本逻辑', () => {
     })
 
     expect(HeatmapToolbar.computed.gradientCss.call(toolbar)).toContain('#00f 0%')
+    HeatmapToolbar.methods.syncLayerState.call(toolbar)
+    expect(toolbar.localOpacity).toBe(64)
 
-    HeatmapToolbar.methods.decreaseOpacity.call(toolbar)
+    HeatmapToolbar.methods.updateOpacity.call(toolbar, toolbar.localOpacity - toolbar.step)
     HeatmapToolbar.methods.handleVisibleChange.call(toolbar, false)
 
-    expect(toolbar.localOpacity).toBe(75)
-    expect(toolbar.$emit).toHaveBeenCalledWith('opacity-change', 75)
+    expect(toolbar.localOpacity).toBe(44)
+    expect(toolbar.$emit).toHaveBeenCalledWith('opacity-change', 44)
     expect(toolbar.$emit).toHaveBeenCalledWith('visible-change', false)
     expect(mapStore.commandQueue.map((command) => command.type)).toEqual([
       'layer:style:patch',
       'layer:visible'
     ])
-    expect(mapStore.commandQueue[0].payload.stylePatch.heatmap.opacity).toEqual([0.15, 0.75])
+    expect(mapStore.commandQueue[0].payload.stylePatch.heatmap.opacity).toEqual([0.15, 0.44])
   })
 
   test('CustomerHeatmapToolbar 按 loca 模式裁剪透明度并派发图层选项', () => {

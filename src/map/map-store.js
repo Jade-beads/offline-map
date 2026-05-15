@@ -3,20 +3,20 @@ import Vue from 'vue'
 const DEFAULT_FEATURE_HIGHLIGHT_STYLE = {
   point: {
     renderer: 'pin',
-    color: '#f59e0b',
+    color: '#D21F3E',
     size: 36,
     zIndex: 120
   },
   line: {
-    strokeColor: '#f59e0b',
+    strokeColor: '#D21F3E',
     strokeOpacity: 1,
     strokeWeight: 6,
     zIndex: 120
   },
   polygon: {
-    fillColor: '#f59e0b',
+    fillColor: '#D21F3E',
     fillOpacity: 0.28,
-    strokeColor: '#f59e0b',
+    strokeColor: '#D21F3E',
     strokeOpacity: 1,
     strokeWeight: 4,
     zIndex: 120

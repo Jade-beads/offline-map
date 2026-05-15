@@ -193,7 +193,7 @@ export function createWMTSLayer(layerId, context) {
 
   function createLayerInstance() {
     if (!AMap || typeof AMap.TileLayer !== 'function') {
-      throw new Error('createWMTSLayer: 当前 AMap SDK 未提供 AMap.TileLayer')
+      throw new Error('createWMTSLayer: AMap.TileLayer 在当前离线包中不可用')
     }
 
     return new AMap.TileLayer({

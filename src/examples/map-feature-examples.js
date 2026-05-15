@@ -4,6 +4,7 @@ export const EXAMPLE_REGION_LAYER_ID = 'example-region-boundary'
 export const EXAMPLE_MIXED_LAYER_ID = 'example-mixed-overlays'
 export const EXAMPLE_PREFIX_LAYER_ID = 'example-prefix-temporary'
 export const EXAMPLE_CLUSTER_LAYER_ID = 'example-bank-cluster'
+export const EXAMPLE_BANK_LABEL_LAYER_ID = 'example-bank-label-points'
 
 export const EXAMPLE_FEATURE_IDS = {
   point: 'example-point-001',
@@ -363,4 +364,60 @@ export function getMixedFeatureInfoExample(featureId) {
 
 export function getLayerInfoExample() {
   return mapActions.getLayerList()
+}
+
+const bankLabelGeoJSON = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      id: 'bank-label-001',
+      properties: { id: 'bank-label-001', name: '中国银行 人民广场支行' },
+      geometry: { type: 'Point', coordinates: [121.4737, 31.2304] }
+    },
+    {
+      type: 'Feature',
+      id: 'bank-label-002',
+      properties: { id: 'bank-label-002', name: '工商银行 南京路支行' },
+      geometry: { type: 'Point', coordinates: [121.4812, 31.2355] }
+    },
+    {
+      type: 'Feature',
+      id: 'bank-label-003',
+      properties: { id: 'bank-label-003', name: '建设银行 外滩支行' },
+      geometry: { type: 'Point', coordinates: [121.4874, 31.2333] }
+    },
+    {
+      type: 'Feature',
+      id: 'bank-label-004',
+      properties: { id: 'bank-label-004', name: '农业银行 陆家嘴支行' },
+      geometry: { type: 'Point', coordinates: [121.5024, 31.2399] }
+    }
+  ]
+}
+
+export function renderBankLabelExample() {
+  mapActions.renderGeoJSONLayer({
+    layerId: EXAMPLE_BANK_LABEL_LAYER_ID,
+    visible: true,
+    style: {
+      point: {
+        renderer: 'pin',
+        color: '#0f2a4e',
+        size: 30,
+        zIndex: 100,
+        label: {
+          field: 'name',
+          direction: 'bottom',
+          offset: [0, 4]
+        }
+      }
+    }
+  }, bankLabelGeoJSON)
+
+  mapActions.fitLayerView(EXAMPLE_BANK_LABEL_LAYER_ID, { padding: [80, 120], maxZoom: 15 })
+}
+
+export function clearBankLabelExample() {
+  mapActions.clearLayer(EXAMPLE_BANK_LABEL_LAYER_ID)
 }

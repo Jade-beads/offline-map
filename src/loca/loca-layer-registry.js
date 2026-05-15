@@ -201,7 +201,7 @@ function getLocaLayerConstructor(Loca, type) {
   const LayerConstructor = Loca[constructorName]
 
   if (typeof LayerConstructor !== 'function') {
-    console.warn(`[Loca] ${constructorName} is unavailable in the current Loca SDK.`)
+    console.warn(`[Loca] ${constructorName} is unavailable in the offline package.`)
     return null
   }
 
@@ -690,7 +690,7 @@ export function createLocaLayer(layerId, context) {
     clearLocaLayer()
 
     if (typeof Loca.GeoJSONSource !== 'function') {
-      console.warn('[Loca] GeoJSONSource is unavailable in the current Loca SDK.')
+      console.warn('[Loca] GeoJSONSource is unavailable in the offline package.')
       return
     }
 

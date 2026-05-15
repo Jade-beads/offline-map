@@ -528,31 +528,37 @@ function applyOverlayStyle(AMap, overlay, feature, kind, style) {
   }
 }
 
+function applyMarkerLabel(marker, label) {
+  if (label && typeof marker.setLabel === 'function') {
+    marker.setLabel(label)
+  }
+}
+
 function createImageMarker(AMap, feature, position, style) {
   const icon = createImageIcon(AMap, style.image || style)
   if (!icon) return createPinMarker(AMap, feature, position, { ...style, renderer: 'pin' })
 
-  return new AMap.Marker({
-    ...createMarkerOptions(AMap, feature, position, style),
-    icon
-  })
+  const options = createMarkerOptions(AMap, feature, position, style)
+  const marker = new AMap.Marker({ ...options, icon })
+  applyMarkerLabel(marker, options.label)
+  return marker
 }
 
 function createHtmlMarker(AMap, feature, position, style) {
   const content = createHtmlMarkerContent(style)
   if (!content) return createPinMarker(AMap, feature, position, { ...style, renderer: 'pin' })
 
-  return new AMap.Marker({
-    ...createMarkerOptions(AMap, feature, position, style),
-    content
-  })
+  const options = createMarkerOptions(AMap, feature, position, style)
+  const marker = new AMap.Marker({ ...options, content })
+  applyMarkerLabel(marker, options.label)
+  return marker
 }
 
 function createPinMarker(AMap, feature, position, style) {
-  return new AMap.Marker({
-    ...createMarkerOptions(AMap, feature, position, { ...style, renderer: 'pin' }),
-    content: createPinContent(feature, style)
-  })
+  const options = createMarkerOptions(AMap, feature, position, { ...style, renderer: 'pin' })
+  const marker = new AMap.Marker({ ...options, content: createPinContent(feature, style) })
+  applyMarkerLabel(marker, options.label)
+  return marker
 }
 
 function createCircleOverlay(AMap, feature, position, style) {
@@ -1124,7 +1130,7 @@ function makeGeoJSONLayer(layerId, context) {
         if (heatmap) {
           refreshHeatmap()
         } else {
-          console.warn('[AmapMap] AMap.HeatMap is unavailable in the current AMap SDK.')
+          console.warn('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
         }
 
         return
@@ -1183,7 +1189,7 @@ function makeGeoJSONLayer(layerId, context) {
         if (heatmap) {
           refreshHeatmap()
         } else {
-          console.warn('[AmapMap] AMap.HeatMap is unavailable in the current AMap SDK.')
+          console.warn('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
         }
 
         return
@@ -1204,7 +1210,7 @@ function makeGeoJSONLayer(layerId, context) {
         if (heatmap) {
           refreshHeatmap()
         } else {
-          console.warn('[AmapMap] AMap.HeatMap is unavailable in the current AMap SDK.')
+          console.warn('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
         }
 
         return

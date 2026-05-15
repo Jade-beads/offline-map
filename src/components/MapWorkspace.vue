@@ -60,13 +60,6 @@
       :layer-id="heatmapToolbarLayerId"
       mode="loca"
       title="热力图"
-      :visible="heatmapLayerVisible"
-      :opacity="heatmapLayerOpacity"
-      :stops="heatmapLegendStops"
-      low-label="低"
-      high-label="高"
-      @visible-change="heatmapLayerVisible = $event"
-      @opacity-change="heatmapLayerOpacity = $event"
     />
 
     <section class="example-panel">
@@ -93,6 +86,8 @@
         <el-button size="mini" @click="handleShowFeatureInfo">要素信息</el-button>
         <el-button size="mini" @click="handleShowLayerInfo">图层信息</el-button>
         <el-button size="mini" @click="handleClearAllMapLayers">清空地图</el-button>
+        <el-button size="mini" @click="handleRenderBankLabel">银行点Label</el-button>
+        <el-button size="mini" @click="handleClearBankLabel">清Label</el-button>
         <el-button size="mini" @click="handleRenderLocaMassPoints">Loca海量点</el-button>
         <el-button size="mini" @click="handleUpdateLocaStyle">Loca换色</el-button>
         <el-button size="mini" @click="handleHighlightLocaPoint">Loca高亮</el-button>
@@ -116,6 +111,7 @@ import { mapActions, mapStore } from '../map/map-store'
 import {
   EXAMPLE_FEATURE_IDS,
   clearAllMapLayersExample,
+  clearBankLabelExample,
   clearClusterLayerExample,
   clearMixedHighlightExample,
   clearPrefixLayerExample,
@@ -125,6 +121,7 @@ import {
   highlightMixedFeatureExample,
   patchClusterLayerStyleExample,
   patchMixedLayerStyleExample,
+  renderBankLabelExample,
   renderClusterLayerExample,
   renderMixedOverlayExample,
   renderPrefixLayerExample,
@@ -164,16 +161,7 @@ export default {
       actions: mapActions,
       keyword: '',
       heatmapToolbarVisible: false,
-      heatmapToolbarLayerId: LOCA_EXAMPLE_HEAT_LAYER_ID,
-      heatmapLayerVisible: true,
-      heatmapLayerOpacity: 86,
-      heatmapLegendStops: [
-        { value: 0.2, color: '#6b5ea8', label: '913.5万' },
-        { value: 0.45, color: '#84cc16', label: '1,748.7万' },
-        { value: 0.7, color: '#facc15', label: '2,500.1万' },
-        { value: 0.85, color: '#f97316', label: '2,998.8万' },
-        { value: 1, color: '#ef4444', label: '10,834.8万' }
-      ]
+      heatmapToolbarLayerId: LOCA_EXAMPLE_HEAT_LAYER_ID
     }
   },
   watch: {
@@ -252,6 +240,12 @@ export default {
     handleClearAllMapLayers() {
       clearAllMapLayersExample()
     },
+    handleRenderBankLabel() {
+      renderBankLabelExample()
+    },
+    handleClearBankLabel() {
+      clearBankLabelExample()
+    },
     handleRenderLocaMassPoints() {
       renderLocaMassPointExample()
     },
@@ -270,8 +264,6 @@ export default {
     handleRenderLocaHeatmap() {
       renderLocaHeatmapExample()
       this.heatmapToolbarVisible = true
-      this.heatmapLayerVisible = true
-      this.heatmapLayerOpacity = 86
     },
     handleRenderLocaGrid() {
       renderLocaGridExample()

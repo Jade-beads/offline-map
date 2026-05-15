@@ -587,7 +587,7 @@ HeatMap 实例支持 setDataSet
 拿到包后至少确认下面几点：
 
 ```text
-AMap3.js、plugin.js 或其他离线插件文件中包含 AMap.HeatMap 实现
+AMap3.js、mapsplugin.js 或其他离线插件文件中包含 AMap.HeatMap 实现
 运行时 typeof AMap.HeatMap === 'function'
 new AMap.HeatMap(map, options) 或 new AMap.HeatMap({ map, ...options }) 能返回实例
 实例上存在 setDataSet/getDataSet/addDataPoint

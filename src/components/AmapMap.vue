@@ -24,10 +24,63 @@ function toLngLatArray(lnglat) {
 
 const MAP_OPTIONS = {
   viewMode: '2D',
-  showLabel: true,
+  features: [],
+  showLabel: false,
   showIndoorMap: false,
   jogEnable: false,
   animateEnable: false
+}
+
+const SATELLITE_TILE_HOSTS = [
+  'webst01.is.autonavi.com',
+  'webst02.is.autonavi.com',
+  'webst03.is.autonavi.com',
+  'webst04.is.autonavi.com'
+]
+const SATELLITE_TILE_TEMPLATE = 'http://webst0{1,2,3,4}.is.autonavi.com/appmaptile?style=6&x=[x]&y=[y]&z=[z]'
+
+function createSatelliteLayer(AMap) {
+  if (!AMap || typeof AMap.TileLayer !== 'function') return null
+
+  const LayerConstructor = typeof AMap.TileLayer.Satellite === 'function' ? AMap.TileLayer.Satellite : AMap.TileLayer
+  const layer = new LayerConstructor({
+    tileUrl: SATELLITE_TILE_TEMPLATE,
+    getTileUrl: getSatelliteTileUrl,
+    zIndex: 1,
+    zooms: [3, 18],
+    dataZooms: [3, 18]
+  })
+
+  if (typeof layer.setTileUrl === 'function') {
+    layer.setTileUrl(SATELLITE_TILE_TEMPLATE)
+  }
+
+  return layer
+}
+
+function getSatelliteTileUrl(x, y, z) {
+  const host = SATELLITE_TILE_HOSTS[Math.abs(x + y) % SATELLITE_TILE_HOSTS.length]
+  return `http://${host}/appmaptile?style=6&x=${x}&y=${y}&z=${z}`
+}
+
+function patchAmapOfflineRuntime(AMap) {
+  const config = typeof AMap.getConfig === 'function' ? AMap.getConfig() : null
+  if (config) {
+    config.tileVersion = config.tileVersion || 'offline'
+    config.styleVersion = config.styleVersion || 'offline'
+    config.iconVersion = config.iconVersion || 'offline'
+  }
+
+  const MapConstructor = AMap && AMap.Map
+  const prototype = MapConstructor && MapConstructor.prototype
+  if (!prototype) return
+
+  // mapsplugin.js 依赖该 API，当前离线 AMap3.js 构建没有直接暴露。
+  if (typeof prototype.getOutseaState !== 'function') {
+    prototype.getOutseaState = function getOutseaState() {
+      return this.YG
+    }
+  }
 }
 
 function observeMapComplete(map, timeout = 8000) {
@@ -110,11 +163,14 @@ export default {
     try {
       const AMap = window.AMap
       if (!AMap || typeof AMap.Map !== 'function') {
-        throw new Error('window.AMap 未加载，请检查高德地图 JSAPI script 配置。')
+        throw new Error('window.AMap is missing. Please check public/amap/AMap3.js.')
       }
 
+      patchAmapOfflineRuntime(AMap)
+      const satelliteLayer = createSatelliteLayer(AMap)
       const map = new AMap.Map(this.$refs.container, {
         ...MAP_OPTIONS,
+        layers: satelliteLayer ? [satelliteLayer] : [],
         zoom: this.store.viewport.zoom,
         center: this.store.viewport.center
       })
@@ -141,7 +197,7 @@ export default {
         this.bindCoordinatePicker()
       }
     } catch (error) {
-      const message = error && error.message ? error.message : '请检查高德地图服务配置。'
+      const message = error && error.message ? error.message : '请检查 public/amap 离线资源包。'
       this.errorMessage = `高德地图加载失败：${message}`
       console.error(error)
     } finally {
@@ -286,7 +342,7 @@ export default {
     setupLocaController(AMap, map) {
       const Loca = window.Loca
       if (!Loca) {
-        console.warn('[AmapMap] window.Loca 未加载，请检查 Loca script 配置。')
+        console.warn('[AmapMap] window.Loca is missing. Please check public/amap/Loca.js.')
         return
       }
 
