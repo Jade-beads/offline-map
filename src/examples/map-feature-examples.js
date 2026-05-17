@@ -5,6 +5,8 @@ export const EXAMPLE_MIXED_LAYER_ID = 'example-mixed-overlays'
 export const EXAMPLE_PREFIX_LAYER_ID = 'example-prefix-temporary'
 export const EXAMPLE_CLUSTER_LAYER_ID = 'example-bank-cluster'
 export const EXAMPLE_BANK_LABEL_LAYER_ID = 'example-bank-label-points'
+export const EXAMPLE_HOVER_LAYER_ID = 'example-hover-test'
+export const EXAMPLE_INFO_WINDOW_LAYER_ID = 'example-info-window-test'
 
 export const EXAMPLE_FEATURE_IDS = {
   point: 'example-point-001',
@@ -420,4 +422,150 @@ export function renderBankLabelExample() {
 
 export function clearBankLabelExample() {
   mapActions.clearLayer(EXAMPLE_BANK_LABEL_LAYER_ID)
+}
+
+const hoverTestGeoJSON = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      id: 'hover-001',
+      properties: { id: 'hover-001', name: '中国银行', type: '国有银行' },
+      geometry: { type: 'Point', coordinates: [121.4737, 31.2304] }
+    },
+    {
+      type: 'Feature',
+      id: 'hover-002',
+      properties: { id: 'hover-002', name: '工商银行', type: '国有银行' },
+      geometry: { type: 'Point', coordinates: [121.4812, 31.2355] }
+    },
+    {
+      type: 'Feature',
+      id: 'hover-003',
+      properties: { id: 'hover-003', name: '招商银行', type: '股份制银行' },
+      geometry: { type: 'Point', coordinates: [121.4874, 31.2333] }
+    }
+  ]
+}
+
+const infoWindowTestGeoJSON = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      id: 'info-window-bank-001',
+      properties: {
+        id: 'info-window-bank-001',
+        name: '信息窗测试网点',
+        category: 'branch',
+        shortName: '测',
+        address: '测试路 100 号',
+        manager: '张三'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [121.492, 31.236]
+      }
+    }
+  ]
+}
+
+export function renderHoverTestExample() {
+  mapActions.renderGeoJSONLayer({
+    layerId: EXAMPLE_HOVER_LAYER_ID,
+    visible: true,
+    style: {
+      point: {
+        renderer: 'pin',
+        color: '#1F2D3D',
+        size: 28,
+        zIndex: 100,
+        label: {
+          field: 'name',
+          direction: 'bottom',
+          offset: [0, 4]
+        }
+      }
+    },
+    hoverStyle: {
+      point: {
+        color: ({ properties }) => properties.type === '国有银行' ? '#B6002A' : '#D21F3E',
+        size: 38,
+        zIndex: 150
+      }
+    },
+    events: {
+      click: (feature) => {
+        console.log('[hover-test] 点击：', feature && feature.properties)
+      }
+    }
+  }, hoverTestGeoJSON)
+
+  mapActions.fitLayerView(EXAMPLE_HOVER_LAYER_ID, { padding: [80, 120], maxZoom: 15 })
+}
+
+export function clearHoverTestExample() {
+  mapActions.clearLayer(EXAMPLE_HOVER_LAYER_ID)
+}
+
+export function renderInfoWindowTestExample() {
+  mapActions.renderGeoJSONLayer({
+    layerId: EXAMPLE_INFO_WINDOW_LAYER_ID,
+    visible: true,
+    style: {
+      point: {
+        renderer: 'pin',
+        textField: 'shortName',
+        color: '#2563eb',
+        size: 32,
+        zIndex: 120
+      }
+    },
+    clickStyle: {
+      point: {
+        color: '#dc2626',
+        size: 40,
+        zIndex: 160
+      }
+    },
+    infoWindow: {
+      title: 'name',
+      fields: [
+        { label: '类型', field: 'category' },
+        { label: '地址', field: 'address' },
+        { label: '负责人', field: 'manager' }
+      ],
+      actions: [
+        { key: 'detail', label: '查看详情', type: 'primary' },
+        { key: 'close', label: '关闭' }
+      ],
+      onAction(action, context) {
+        console.log('[InfoWindow action]', action.key, {
+          layerId: context.layerId,
+          featureId: context.featureId,
+          properties: context.properties,
+          lnglat: context.lnglat
+        })
+
+        if (action.key === 'close') {
+          context.close()
+        }
+      }
+    },
+    events: {
+      click(feature, event) {
+        console.log('[InfoWindow click]', event.featureId, feature.properties)
+      }
+    }
+  }, infoWindowTestGeoJSON)
+
+  mapActions.fitLayerView(EXAMPLE_INFO_WINDOW_LAYER_ID, {
+    padding: [80, 120],
+    maxZoom: 15
+  })
+}
+
+export function clearInfoWindowTestExample() {
+  mapActions.closeInfoWindow()
+  mapActions.clearLayer(EXAMPLE_INFO_WINDOW_LAYER_ID)
 }

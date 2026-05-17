@@ -88,7 +88,11 @@
         <el-button size="mini" @click="handleClearAllMapLayers">清空地图</el-button>
         <el-button size="mini" @click="handleRenderBankLabel">银行点Label</el-button>
         <el-button size="mini" @click="handleClearBankLabel">清Label</el-button>
-        <el-button size="mini" @click="handleRenderLocaMassPoints">Loca海量点</el-button>
+        <el-button size="mini" @click="handleRenderHoverTest">Hover测试</el-button>
+        <el-button size="mini" @click="handleClearHoverTest">清Hover</el-button>
+        <el-button size="mini" @click="handleRenderInfoWindowTest">信息窗测试</el-button>
+        <el-button size="mini" @click="handleClearInfoWindowTest">清信息窗</el-button>
+<el-button size="mini" @click="handleRenderLocaMassPoints">Loca海量点</el-button>
         <el-button size="mini" @click="handleUpdateLocaStyle">Loca换色</el-button>
         <el-button size="mini" @click="handleHighlightLocaPoint">Loca高亮</el-button>
         <el-button size="mini" @click="handleClearLocaHighlight">清Loca高亮</el-button>
@@ -101,17 +105,22 @@
         <el-button size="mini" @click="handleClearAllLocaLayers">清空Loca</el-button>
       </div>
     </section>
+    <quadrant-legend />
   </div>
+
 </template>
 
 <script>
 import AmapMap from './AmapMap.vue'
 import HeatmapToolbar from './HeatmapToolbar.vue'
+import QuadrantLegend from "@/components/QuadrantLegend.vue";
 import { mapActions, mapStore } from '../map/map-store'
 import {
   EXAMPLE_FEATURE_IDS,
   clearAllMapLayersExample,
   clearBankLabelExample,
+  clearHoverTestExample,
+  clearInfoWindowTestExample,
   clearClusterLayerExample,
   clearMixedHighlightExample,
   clearPrefixLayerExample,
@@ -122,6 +131,8 @@ import {
   patchClusterLayerStyleExample,
   patchMixedLayerStyleExample,
   renderBankLabelExample,
+  renderHoverTestExample,
+  renderInfoWindowTestExample,
   renderClusterLayerExample,
   renderMixedOverlayExample,
   renderPrefixLayerExample,
@@ -153,7 +164,8 @@ export default {
   name: 'MapWorkspace',
   components: {
     AmapMap,
-    HeatmapToolbar
+    HeatmapToolbar,
+    QuadrantLegend
   },
   data() {
     return {
@@ -245,6 +257,19 @@ export default {
     },
     handleClearBankLabel() {
       clearBankLabelExample()
+    },
+    handleRenderHoverTest() {
+      renderHoverTestExample()
+    },
+    handleClearHoverTest() {
+      clearHoverTestExample()
+    },
+    handleRenderInfoWindowTest() {
+      renderInfoWindowTestExample()
+      this.showMessage('点击测试点位可查看信息窗。')
+    },
+    handleClearInfoWindowTest() {
+      clearInfoWindowTestExample()
     },
     handleRenderLocaMassPoints() {
       renderLocaMassPointExample()

@@ -544,6 +544,74 @@ export default {
   pointer-events: none;
 }
 
+.map-info-window-host,
+.map-info-window {
+  box-sizing: border-box;
+  min-width: 220px;
+  max-width: 320px;
+  color: #1f2937;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.map-info-window {
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+}
+
+.map-info-window .iw-title {
+  margin-bottom: 8px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.map-info-window .iw-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.map-info-window .iw-label {
+  color: #64748b;
+}
+
+.map-info-window .iw-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.map-info-window-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 14px 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.map-info-window-action {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  color: #334155;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.map-info-window-action--primary {
+  border-color: #2563eb;
+  color: #fff;
+  background: #2563eb;
+}
+
 .custom-map-marker {
   position: relative;
   width: 24px;

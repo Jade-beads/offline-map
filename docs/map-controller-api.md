@@ -75,6 +75,7 @@ layer:feature-style:clear
 layer:feature-styles:clear
 layer:fit-view
 layer:focus
+infowindow:close
 ```
 
 ## 示例：缩放地图
@@ -263,10 +264,65 @@ const layer = this.getLayer(payload.layerId)
 layer.setData(payload.geoJSON, payload.style)
 ```
 
+如果 `payload.infoWindow` 存在，`MapController` 会包装当前图层的 `events.click`：
+
+```js
+mapActions.renderGeoJSONLayer({
+  layerId: 'bank',
+  visible: true,
+  infoWindow: {
+    title: 'name',
+    fields: [
+      { label: '地址', field: 'address' }
+    ],
+    actions: [
+      { key: 'detail', label: '查看详情', type: 'primary' }
+    ],
+    onAction(action, context) {
+      console.log(action.key, context.featureId)
+      context.close()
+    }
+  },
+  events: {
+    click(feature, event) {
+      console.log('业务点击回调仍会执行', event.featureId)
+    }
+  }
+}, geoJSON)
+```
+
+说明：
+
+- 点击覆盖物时先打开共享信息窗体，再执行业务传入的 `events.click`。
+- `fields` 模式会转义展示内容；`content` 字符串或函数返回值视为业务可信 HTML。
+- `actions` 按钮统一走 `infoWindow.onAction(action, context)`，`context.close()` 会派发关闭当前信息窗体的动作。
+- 信息窗体位置优先使用事件坐标；点覆盖物缺少事件坐标时读取覆盖物位置。
+- 离线包缺少 `AMap.InfoWindow` 时，控制器会使用 `AMap.Marker` 承载同一份窗体内容。
+
 图层渲染细节见：
 
 - [map-geojson-layer-protocol.md](./map-geojson-layer-protocol.md)
 - [map-style-protocol.md](./map-style-protocol.md)
+
+## 示例：关闭点击信息窗体
+
+```js
+mapActions.closeInfoWindow()
+```
+
+内部命令：
+
+```js
+{
+  type: 'infowindow:close'
+}
+```
+
+说明：
+
+- 关闭的是当前普通 GeoJSON 覆盖物点击打开的信息窗体。
+- 使用 `AMap.InfoWindow` 时调用共享实例的 `close()`。
+- 使用 Marker 承载窗体时会把该临时 Marker 从地图上移除。
 
 ## 示例：控制图层显示隐藏
 

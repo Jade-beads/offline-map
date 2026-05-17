@@ -98,6 +98,25 @@ class FakeLayer {
   }
 }
 
+class FakeInfoWindow {
+  constructor(options = {}) {
+    this.options = options
+    this.content = ''
+    this.openCalls = []
+    this.close = jest.fn()
+    FakeInfoWindow.instances.push(this)
+  }
+
+  setContent(content) {
+    this.content = content
+  }
+
+  open(map, lnglat) {
+    this.openCalls.push({ map, lnglat })
+  }
+}
+FakeInfoWindow.instances = []
+
 class FakeLngLat {
   constructor(lng, lat) {
     this.lng = lng
@@ -1423,6 +1442,199 @@ describe('LocaController branch coverage', () => {
     expect(actions.removeLayerInfo).toHaveBeenCalledWith('loca-a')
     controller.destroy()
     expect(actions.clearLayerInfo).toHaveBeenCalled()
+  })
+
+  test('wraps GeoJSON click events to open a shared InfoWindow before business callback', () => {
+    FakeInfoWindow.instances = []
+    const controller = createMapController()
+    const layer = new FakeLayer('geojson')
+    const businessClick = jest.fn()
+    const lnglatA = [121.5, 31.2]
+    const lnglatB = [121.6, 31.3]
+
+    controller.AMap = { InfoWindow: FakeInfoWindow }
+    controller.getLayer = jest.fn(() => layer)
+
+    controller.renderLayer({
+      layerId: 'bank-layer',
+      geoJSON: { type: 'FeatureCollection', features: [pointFeature] },
+      style: { point: { renderer: 'pin' } },
+      infoWindow: {
+        content: (feature, properties) => `<div>${feature.id}-${properties.name}</div>`
+      },
+      events: {
+        click: businessClick
+      }
+    })
+
+    const wrappedClick = layer.dataArgs[2].events.click
+    wrappedClick(pointFeature, { lnglat: lnglatA })
+    wrappedClick(pointFeature, { lnglat: lnglatB })
+
+    expect(FakeInfoWindow.instances).toHaveLength(1)
+    expect(FakeInfoWindow.instances[0].options).toEqual({
+      isCustom: true,
+      autoMove: true,
+      closeWhenClickMap: false
+    })
+    expect(FakeInfoWindow.instances[0].content).toBe('<div>p1-point</div>')
+    expect(FakeInfoWindow.instances[0].openCalls).toEqual([
+      { map: controller.map, lnglat: lnglatA },
+      { map: controller.map, lnglat: lnglatB }
+    ])
+    expect(businessClick).toHaveBeenCalledTimes(2)
+    expect(businessClick).toHaveBeenCalledWith(pointFeature, { lnglat: lnglatA })
+  })
+
+  test('opens InfoWindow at overlay position when click event has no lnglat', () => {
+    FakeInfoWindow.instances = []
+    const controller = createMapController()
+    const layer = new FakeLayer('geojson')
+    const markerPosition = [121.7, 31.4]
+
+    controller.AMap = { InfoWindow: FakeInfoWindow }
+    controller.getLayer = jest.fn(() => layer)
+
+    controller.renderLayer({
+      layerId: 'bank-layer',
+      infoWindow: {
+        content: '<div>详情</div>'
+      }
+    })
+
+    layer.dataArgs[2].events.click(pointFeature, {
+      overlay: {
+        getPosition: () => markerPosition
+      }
+    })
+
+    expect(FakeInfoWindow.instances).toHaveLength(1)
+    expect(FakeInfoWindow.instances[0].openCalls).toEqual([
+      { map: controller.map, lnglat: markerPosition }
+    ])
+  })
+
+  test('does not open InfoWindow when click payload has no usable position', () => {
+    FakeInfoWindow.instances = []
+    const controller = createMapController()
+    const layer = new FakeLayer('geojson')
+
+    controller.AMap = { InfoWindow: FakeInfoWindow }
+    controller.getLayer = jest.fn(() => layer)
+
+    controller.renderLayer({
+      layerId: 'bank-layer',
+      infoWindow: {
+        content: '<div>详情</div>'
+      }
+    })
+
+    layer.dataArgs[2].events.click(pointFeature, {})
+
+    expect(FakeInfoWindow.instances).toHaveLength(0)
+  })
+
+  test('routes close InfoWindow command to the shared instance', () => {
+    const controller = createMapController()
+    controller.infoWindow = new FakeInfoWindow()
+
+    controller.handleCommand({ type: 'infowindow:close' })
+
+    expect(controller.infoWindow.close).toHaveBeenCalledTimes(1)
+  })
+
+  test('uses marker-backed InfoWindow when the offline AMap package has no InfoWindow constructor', () => {
+    FakeAMapOverlay.instances = []
+    const controller = createMapController()
+    const layer = new FakeLayer('geojson')
+    const markerPosition = [121.7, 31.4]
+    const plugin = jest.fn()
+
+    controller.AMap = {
+      Marker: FakeAMapOverlay,
+      Pixel: FakePixel,
+      plugin
+    }
+    controller.getLayer = jest.fn(() => layer)
+
+    controller.renderLayer({
+      layerId: 'bank-layer',
+      infoWindow: {
+        content: '<div class="map-info-window">详情</div>'
+      }
+    })
+
+    layer.dataArgs[2].events.click(pointFeature, {
+      overlay: {
+        getPosition: () => markerPosition
+      }
+    })
+
+    expect(FakeAMapOverlay.instances).toHaveLength(1)
+    expect(plugin).not.toHaveBeenCalled()
+    expect(FakeAMapOverlay.instances[0].options.position).toEqual(markerPosition)
+    expect(FakeAMapOverlay.instances[0].options.content).toContain('map-info-window-host')
+    expect(FakeAMapOverlay.instances[0].options.content).toContain('map-info-window')
+    expect(FakeAMapOverlay.instances[0].options.offset).toEqual(new FakePixel(0, 0))
+
+    controller.handleCommand({ type: 'infowindow:close' })
+
+    expect(FakeAMapOverlay.instances[0].map).toBeNull()
+  })
+
+  test('does not keep unused InfoWindow map click handler state', () => {
+    const controller = createMapController()
+
+    expect(controller).not.toHaveProperty('infoWindowMapClickHandler')
+  })
+
+  test('routes InfoWindow action button clicks with feature context', () => {
+    FakeInfoWindow.instances = []
+    const controller = createMapController()
+    const layer = new FakeLayer('geojson')
+    const onAction = jest.fn()
+    const lnglat = [121.5, 31.2]
+
+    controller.AMap = { InfoWindow: FakeInfoWindow }
+    controller.getLayer = jest.fn(() => layer)
+
+    controller.renderLayer({
+      layerId: 'bank-layer',
+      infoWindow: {
+        title: 'name',
+        fields: [
+          { label: '分类', field: 'category' }
+        ],
+        actions: [
+          { key: 'detail', label: '查看详情', type: 'primary' }
+        ],
+        onAction
+      }
+    })
+
+    layer.dataArgs[2].events.click(pointFeature, { lnglat })
+
+    const host = FakeInfoWindow.instances[0].content
+    const button = host.querySelector('[data-map-info-action="detail"]')
+    expect(host.innerHTML).toContain('map-info-window')
+    expect(host.innerHTML).toContain('查看详情')
+    expect(button).not.toBeNull()
+
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+    expect(onAction).toHaveBeenCalledTimes(1)
+    expect(onAction.mock.calls[0][0]).toEqual({
+      key: 'detail',
+      label: '查看详情',
+      type: 'primary'
+    })
+    expect(onAction.mock.calls[0][1]).toMatchObject({
+      layerId: 'bank-layer',
+      featureId: 'p1',
+      properties: pointFeature.properties,
+      lnglat
+    })
+    expect(typeof onAction.mock.calls[0][1].close).toBe('function')
   })
 
   test('uses container clear when destroy is not available', () => {

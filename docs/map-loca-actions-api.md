@@ -566,6 +566,7 @@ mapActions.searchCoordinate('117.2272,31.8206')
 | `params.events` | `object` | 普通覆盖物事件入口，支持 `click`、`mouseover`、`mouseout`，也支持 `hover` 作为 `mouseover` 的别名 |
 | `params.hoverStyle` | `object` | 鼠标移入时的临时高亮样式，结构与 `style` 一致 |
 | `params.clickStyle` | `object` | 鼠标点击后的选中高亮样式，结构与 `style` 一致；点击下一个要素会替换上一个选中态 |
+| `params.infoWindow` | `object` | 点击普通覆盖物时打开的信息窗体配置，支持字段展示、可信 HTML 内容和操作按钮 |
 | `params.category` | `string` | 未包装 Geometry 的默认分类 |
 | `params.properties` | `object` | 未包装 Geometry 的默认属性 |
 | `params.selection` | `object` | 渲染后自动聚焦的 `{ type, id }` |
@@ -640,6 +641,48 @@ mapActions.renderGeoJSONLayer({
   }
 }, geoJSON)
 ```
+
+点击信息窗体示例：
+
+```js
+mapActions.renderGeoJSONLayer({
+  layerId: 'bank',
+  visible: true,
+  style: {
+    point: {
+      renderer: 'pin',
+      textField: 'shortName',
+      color: '#1677ff',
+      size: 30
+    }
+  },
+  infoWindow: {
+    title: 'name',
+    fields: [
+      { label: '机构类型', field: 'category' },
+      { label: '地址', field: 'address' }
+    ],
+    actions: [
+      { key: 'detail', label: '查看详情', type: 'primary' }
+    ],
+    onAction(action, context) {
+      if (action.key === 'detail') {
+        console.log(context.layerId, context.featureId, context.properties)
+        context.close()
+      }
+    }
+  }
+}, geoJSON)
+```
+
+说明：
+
+- `fields` 生成纯信息内容，标题和字段值会做 HTML 转义。
+- `content` 可传字符串或函数 `(feature, properties, event) => html`，返回内容视为业务可信 HTML。
+- `content` 可以和 `actions` 同时使用，按钮会追加在内容下方。
+- 配置 `actions` 时必须同时提供 `onAction(action, context)`，否则 `renderGeoJSONLayer` 会抛出明确错误。
+- `context` 包含 `layerId`、`featureId`、`feature`、`properties`、`lnglat`、`overlay` 和 `close()`。
+- 信息窗体位置优先使用点击事件坐标；点覆盖物事件没有坐标时，会读取覆盖物自身位置。
 
 如果点位使用自定义 HTML，也可以在交互样式中替换 HTML 内容，从而通过 CSS class 达到高亮效果：
 
@@ -719,6 +762,18 @@ mapActions.renderGeoJSONLayer({
   }
 }, geoJSON)
 ```
+
+### closeInfoWindow()
+
+使用场景：关闭普通 GeoJSON 覆盖物点击打开的信息窗体。
+
+示例：
+
+```js
+mapActions.closeInfoWindow()
+```
+
+说明：该方法只影响 `renderGeoJSONLayer()` 的 `infoWindow` 点击窗体，不会清除图层、覆盖物或业务数据。
 
 ### renderGeoJSONClusterLayer(params, geoJSON)
 

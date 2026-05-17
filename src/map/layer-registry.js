@@ -1,4 +1,5 @@
 import {
+  evaluateFunctions,
   getFeatureCategory,
   getFeatureId,
   getFeatureName,
@@ -428,12 +429,12 @@ function createMarkerOptions(AMap, feature, position, style) {
   const size = normalizePair(style.size || (style.image && style.image.size), [28, 28])
   const renderer = style.renderer || 'pin'
   const centerOffset = [-size[0] / 2, -size[1] / 2]
+  const label = createMarkerLabel(AMap, style, feature)
   const options = {
     ...pickDefined(style, MARKER_OPTION_KEYS),
     position,
     title: style.title || getFeatureName(feature),
-    label: createMarkerLabel(AMap, style, feature),
-    extData: createFeatureExtData(feature, { position })
+    extData: createFeatureExtData(feature, { position, label })
   }
 
   if (style.offset) {
@@ -540,7 +541,7 @@ function createImageMarker(AMap, feature, position, style) {
 
   const options = createMarkerOptions(AMap, feature, position, style)
   const marker = new AMap.Marker({ ...options, icon })
-  applyMarkerLabel(marker, options.label)
+  applyMarkerLabel(marker, options.extData.label)
   return marker
 }
 
@@ -550,14 +551,14 @@ function createHtmlMarker(AMap, feature, position, style) {
 
   const options = createMarkerOptions(AMap, feature, position, style)
   const marker = new AMap.Marker({ ...options, content })
-  applyMarkerLabel(marker, options.label)
+  applyMarkerLabel(marker, options.extData.label)
   return marker
 }
 
 function createPinMarker(AMap, feature, position, style) {
   const options = createMarkerOptions(AMap, feature, position, { ...style, renderer: 'pin' })
   const marker = new AMap.Marker({ ...options, content: createPinContent(feature, style) })
-  applyMarkerLabel(marker, options.label)
+  applyMarkerLabel(marker, options.extData.label)
   return marker
 }
 
@@ -935,6 +936,9 @@ function makeGeoJSONLayer(layerId, context) {
     if (overlays.length && !overlaysAdded) {
       overlays.forEach((overlay) => {
         map.add(overlay)
+        // AMap 离线包需要在 Marker 加入地图后再应用 label。
+        const extData = overlay.getExtData && overlay.getExtData()
+        applyMarkerLabel(overlay, extData && extData.label)
       })
       overlaysAdded = true
     }
@@ -967,16 +971,23 @@ function makeGeoJSONLayer(layerId, context) {
     const featureKey = getFeatureStyleKey(feature)
     const includeClick = options.includeClick !== false
     const includeHover = options.includeHover !== false
+    const context = {
+      feature,
+      properties: getFeatureProperties(feature),
+      category: getFeatureCategory(feature),
+      geometry: feature && feature.geometry,
+      kind
+    }
     const styleChain = [baseStyle]
 
     if (override) {
-      styleChain.push(getScopedStyleOverride(override, kind))
+      styleChain.push(evaluateFunctions(getScopedStyleOverride(override, kind), context))
     }
     if (includeClick && clickedFeatureKey && clickedFeatureKey === featureKey) {
-      styleChain.push(getScopedStyleOverride(clickStyle, kind))
+      styleChain.push(evaluateFunctions(getScopedStyleOverride(clickStyle, kind), context))
     }
     if (includeHover && hoveredFeatureKey && hoveredFeatureKey === featureKey) {
-      styleChain.push(getScopedStyleOverride(hoverStyle, kind))
+      styleChain.push(evaluateFunctions(getScopedStyleOverride(hoverStyle, kind), context))
     }
 
     return mergeStyle(...styleChain)

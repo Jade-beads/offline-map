@@ -179,7 +179,7 @@ function resolveRules(rules, context, kind) {
   }, {})
 }
 
-function evaluateFunctions(value, context) {
+export function evaluateFunctions(value, context) {
   if (typeof value === 'function') {
     return value(context)
   }

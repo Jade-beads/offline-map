@@ -45,6 +45,19 @@ function getRenderDefaultProperties(renderParams) {
   return Object.keys(properties).length ? properties : undefined
 }
 
+function validateInfoWindowConfig(renderParams) {
+  const infoWindow = renderParams.infoWindow
+  if (!isPlainObject(infoWindow)) return
+
+  const actions = Array.isArray(infoWindow.actions)
+    ? infoWindow.actions.filter(Boolean)
+    : []
+
+  if (actions.length && typeof infoWindow.onAction !== 'function') {
+    throw new Error('mapActions.renderGeoJSONLayer: infoWindow.actions 需要提供 infoWindow.onAction 回调')
+  }
+}
+
 export const vm = new Vue()
 
 export const mapStore = Vue.observable({
@@ -260,6 +273,10 @@ export const mapActions = {
     })
   },
 
+  closeInfoWindow() {
+    this.dispatchMapCommand('infowindow:close')
+  },
+
   zoomIn() {
     this.dispatchMapCommand('zoom:in')
   },
@@ -411,6 +428,8 @@ export const mapActions = {
       return
     }
 
+    validateInfoWindowConfig(renderParams)
+
     this.dispatchMapCommand('layer:render', {
       layerId,
       geoJSON,
@@ -419,6 +438,7 @@ export const mapActions = {
       events: renderParams.events,
       hoverStyle: renderParams.hoverStyle,
       clickStyle: renderParams.clickStyle,
+      infoWindow: renderParams.infoWindow,
       defaultProperties: getRenderDefaultProperties(renderParams)
     })
 

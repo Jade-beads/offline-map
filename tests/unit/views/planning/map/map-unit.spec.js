@@ -73,6 +73,7 @@ class FakeMarker {
     this.extData = options.extData
     this.content = options.content
     this.handlers = {}
+    this.labelCalls = []
   }
 
   show() {
@@ -101,6 +102,14 @@ class FakeMarker {
 
   getPosition() {
     return this.options.position
+  }
+
+  setLabel(label) {
+    this.label = label
+    this.labelCalls.push({
+      label,
+      addedToMap: Boolean(this.addedToMap)
+    })
   }
 
   on(type, handler) {
@@ -310,8 +319,12 @@ function createFakeMap() {
     fitViewCalls: [],
     add(layer) {
       if (Array.isArray(layer)) {
+        layer.forEach((item) => {
+          item.addedToMap = true
+        })
         this.added.push(...layer)
       } else {
+        layer.addedToMap = true
         this.added.push(layer)
       }
     },
@@ -565,9 +578,14 @@ describe('map-store actions', () => {
   })
 
   test('dispatches GeoJSON render command with default properties and selection focus', () => {
+    const infoWindow = {
+      content: '<div class="map-info-window">详情</div>'
+    }
+
     mapActions.renderGeoJSONLayer({
       layerId: 'devices',
       visible: true,
+      infoWindow,
       category: 'device',
       properties: {
         source: 'mock'
@@ -587,6 +605,7 @@ describe('map-store actions', () => {
       source: 'mock',
       category: 'device'
     })
+    expect(mapStore.commandQueue[0].payload.infoWindow).toBe(infoWindow)
     expect(mapStore.commandQueue[1]).toEqual({
       seq: mapStore.commandQueue[1].seq,
       type: 'layer:focus',
@@ -622,6 +641,30 @@ describe('map-store actions', () => {
     mapActions.renderGeoJSONLayer({}, { type: 'FeatureCollection', features: [] })
     mapActions.setFeaturesVisible('', ['a'], false)
     mapActions.focusFeature('devices', null)
+
+    expect(mapStore.commandQueue).toHaveLength(0)
+  })
+
+  test('dispatches close InfoWindow command', () => {
+    mapActions.closeInfoWindow()
+
+    expect(mapStore.commandQueue).toHaveLength(1)
+    expect(mapStore.commandQueue[0].type).toBe('infowindow:close')
+    expect(mapStore.commandQueue[0].payload).toBeNull()
+  })
+
+  test('requires onAction when InfoWindow actions are configured', () => {
+    expect(() => mapActions.renderGeoJSONLayer({
+      layerId: 'devices',
+      infoWindow: {
+        actions: [
+          { key: 'detail', label: '查看详情' }
+        ]
+      }
+    }, {
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    })).toThrow('infoWindow.actions 需要提供 infoWindow.onAction 回调')
 
     expect(mapStore.commandQueue).toHaveLength(0)
   })
@@ -667,6 +710,33 @@ describe('map-store actions', () => {
 describe('layer-registry createLayer', () => {
   beforeEach(() => {
     FakeHeatMap.instances = []
+  })
+
+  test('applies marker label after overlay is added to map', () => {
+    const map = createFakeMap()
+    const layer = createLayer('single-point-label', {
+      AMap: createFakeAMap(),
+      map
+    })
+
+    layer.setData(pointFeature, {
+      point: {
+        label: {
+          visible: true,
+          field: 'name',
+          offset: [4, 8]
+        }
+      }
+    })
+
+    expect(map.added).toHaveLength(0)
+
+    layer.show()
+
+    const marker = map.added[0]
+    expect(marker.labelCalls).toHaveLength(2)
+    expect(marker.labelCalls[1].addedToMap).toBe(true)
+    expect(marker.labelCalls[1].label.content).toBe(pointFeature.properties.name)
   })
 
   test('renders mixed GeoJSON overlays and patches style without clearing data', () => {

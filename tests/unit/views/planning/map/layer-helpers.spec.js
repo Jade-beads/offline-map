@@ -1,4 +1,9 @@
-import { createToggleHighlight, renderArrowLines } from '../../../../../src/map/layer-helpers'
+import {
+  buildLocaCategorizedPointGeoJSON,
+  createBankInfoWindowContent,
+  createToggleHighlight,
+  renderArrowLines
+} from '../../../../../src/map/layer-helpers'
 
 jest.mock('../../../../../src/map/map-store', () => ({
   mapActions: {
@@ -20,6 +25,94 @@ function makeFeature(id) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+})
+
+describe('buildLocaCategorizedPointGeoJSON', () => {
+  it('把二维分类点位数组转换为 Loca 可用的 FeatureCollection', () => {
+    const geoJSON = buildLocaCategorizedPointGeoJSON([
+      [
+        {
+          id: 1001,
+          name: '一类点',
+          geom: {
+            type: 'Point',
+            coordinates: [117.225, 31.863]
+          }
+        }
+      ],
+      [
+        {
+          id: '2001',
+          name: '二类点',
+          geom: {
+            type: 'Point',
+            coordinates: [117.231, 31.858]
+          }
+        }
+      ]
+    ])
+
+    expect(geoJSON.type).toBe('FeatureCollection')
+    expect(geoJSON.features).toHaveLength(2)
+    expect(geoJSON.features[0]).toEqual({
+      type: 'Feature',
+      id: '1001',
+      properties: {
+        id: '1001',
+        name: '一类点',
+        category: 'category-0',
+        color: '#1677ff'
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: [117.225, 31.863]
+      }
+    })
+    expect(geoJSON.features[1].properties.category).toBe('category-1')
+    expect(geoJSON.features[1].properties.color).toBe('#16a34a')
+  })
+
+  it('输入结构不合法时抛出明确错误', () => {
+    expect(() => buildLocaCategorizedPointGeoJSON({})).toThrow('categoryPointGroups 必须是二维数组')
+    expect(() => buildLocaCategorizedPointGeoJSON([[{ id: 'p1' }]])).toThrow('geom 必须是 GeoJSON Point')
+  })
+})
+
+describe('createBankInfoWindowContent', () => {
+  it('输出标题和非空字段行', () => {
+    const content = createBankInfoWindowContent([
+      { label: '地址', field: 'address' },
+      { label: '电话', field: 'phone' }
+    ])({}, {
+      name: '中国银行人民广场支行',
+      address: '人民广场',
+      phone: '021-63508888'
+    })
+
+    expect(content).toContain('map-info-window')
+    expect(content).toContain('iw-title')
+    expect(content).toContain('中国银行人民广场支行')
+    expect(content).toContain('地址')
+    expect(content).toContain('人民广场')
+    expect(content).toContain('电话')
+    expect(content).toContain('021-63508888')
+  })
+
+  it('空字段不生成信息行', () => {
+    const content = createBankInfoWindowContent([
+      { label: '地址', field: 'address' },
+      { label: '电话', field: 'phone' }
+    ])({}, {
+      title: '网点详情',
+      address: '',
+      phone: null
+    })
+
+    expect(content).toContain('网点详情')
+    expect(content).not.toContain('地址')
+    expect(content).not.toContain('电话')
+    expect(content).not.toContain('iw-row')
+  })
 })
 
 describe('renderArrowLines', () => {

@@ -20,6 +20,18 @@ mapActions.renderGeoJSONLayer(params, geoJSON)
     category: 'bank',
     source: 'business-api'
   },
+  infoWindow: {
+    title: 'name',
+    fields: [
+      { label: '地址', field: 'address' }
+    ],
+    actions: [
+      { key: 'detail', label: '查看详情', type: 'primary' }
+    ],
+    onAction(action, context) {
+      console.log(action.key, context.featureId)
+    }
+  },
   selection: {
     type: 'bank',
     id: 'bank-001'
@@ -34,9 +46,52 @@ mapActions.renderGeoJSONLayer(params, geoJSON)
 | `style` | `object` | 否 | 图层样式协议。详见 [map-style-protocol.md](./map-style-protocol.md)。 |
 | `category` | `string` | 否 | 给未携带 `properties.category` 的 Feature 或裸 Geometry 设置默认分类。 |
 | `properties` | `object` | 否 | 给未格式化 GeoJSON 补充默认 `properties`。原始 Feature/Geometry 自带的 `properties` 优先级更高。 |
+| `infoWindow` | `object` | 否 | 点击覆盖物时打开的信息窗体配置，只作用于普通 GeoJSON 点、线、面覆盖物。 |
 | `selection` | `object` | 否 | 渲染后定位某个要素。`type` 对应 `layerId`，`id` 对应 Feature id。 |
 
 `map-store` 只负责发送渲染命令，不保存 GeoJSON、图层列表或接口返回的业务数据。
+
+`infoWindow` 支持两种展示方式：
+
+```js
+mapActions.renderGeoJSONLayer({
+  layerId: 'bank',
+  visible: true,
+  infoWindow: {
+    title: 'name',
+    fields: [
+      { label: '机构类型', field: 'category' },
+      { label: '地址', field: 'address' }
+    ]
+  }
+}, geoJSON)
+```
+
+```js
+mapActions.renderGeoJSONLayer({
+  layerId: 'bank',
+  visible: true,
+  infoWindow: {
+    content(feature, properties) {
+      return `<div class="map-info-window">${properties.name}</div>`
+    },
+    actions: [
+      { key: 'detail', label: '查看详情', type: 'primary' }
+    ],
+    onAction(action, context) {
+      console.log(action.key, context.layerId, context.featureId)
+      context.close()
+    }
+  }
+}, geoJSON)
+```
+
+说明：
+
+- `fields` 模式会转义标题、字段标签和字段值，适合纯信息展示。
+- `content` 返回值视为业务可信 HTML，可以和 `actions` 同时使用。
+- `actions` 有值时必须提供 `onAction`，按钮点击回调的 `context` 包含 `layerId`、`featureId`、`properties`、`lnglat`、`overlay` 和 `close()`。
+- 信息窗体使用共享实例，点击下一个覆盖物会替换内容和位置。
 
 渲染后让整个图层进入地图视野：
 

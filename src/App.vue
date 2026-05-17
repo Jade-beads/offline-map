@@ -52,4 +52,5 @@ select {
 .amap-marker-label::after {
   display: none !important;
 }
+
 </style>
