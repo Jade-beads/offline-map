@@ -206,6 +206,11 @@ class FakeRuntimeLocaLayer {
   destroy() {
     this.destroyed = true
   }
+
+  queryFeature(pixel) {
+    this.lastQueryPixel = pixel
+    return this.queryResult || null
+  }
 }
 FakeRuntimeLocaLayer.instances = []
 
@@ -2616,6 +2621,213 @@ describe('layer registry branch coverage', () => {
     expect(warn).toHaveBeenCalledWith('[AmapMap] AMap.HeatMap is unavailable in the offline package.')
 
     warn.mockRestore()
+  })
+
+  test('createLocaLayer dispatches picked feature events and applies hover and click styles', () => {
+    const clicks = []
+    const overs = []
+    const outs = []
+    const container = {
+      added: [],
+      removed: [],
+      renderCount: 0,
+      add(layer) {
+        this.added.push(layer)
+      },
+      remove(layer) {
+        this.removed.push(layer)
+      },
+      requestRender() {
+        this.renderCount += 1
+      }
+    }
+    const map = {
+      handlers: {},
+      on(type, handler) {
+        this.handlers[type] = handler
+      },
+      off(type, handler) {
+        if (!handler || this.handlers[type] === handler) {
+          delete this.handlers[type]
+        }
+      }
+    }
+    const Loca = {
+      GeoJSONSource: FakeLocaSource,
+      PointLayer: FakeRuntimeLocaLayer
+    }
+    const layer = createLocaLayer('loca-events', {
+      Loca,
+      AMap: {},
+      map,
+      container,
+      type: 'point'
+    })
+
+    layer.setData({
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    }, {
+      radius: 6,
+      color: '#1677ff'
+    }, {
+      events: {
+        click(feature, event) {
+          clicks.push({ feature, event })
+        },
+        mouseover(feature, event) {
+          overs.push({ feature, event })
+        },
+        mouseout(feature, event) {
+          outs.push({ feature, event })
+        }
+      },
+      hoverStyle: {
+        color: '#f59e0b'
+      },
+      clickStyle: {
+        radius: 14
+      }
+    })
+    layer.show()
+
+    const visualLayer = FakeRuntimeLocaLayer.instances[0]
+    visualLayer.queryResult = pointFeature
+
+    map.handlers.mousemove({
+      pixel: new FakePixel(3, 4),
+      lnglat: new FakeLngLat(121.5, 31.2)
+    })
+    expect(overs).toHaveLength(1)
+    expect(overs[0].event.featureId).toBe('p1')
+    expect(overs[0].event.layerId).toBe('loca-events')
+    expect(overs[0].event.pixel).toEqual([3, 4])
+    expect(overs[0].event.lnglat).toEqual([121.5, 31.2])
+    expect(layer.getInfo().hoveredFeatureId).toBe('p1')
+    expect(visualLayer.style.color(0, pointFeature)).toBe('#f59e0b')
+
+    map.handlers.click({
+      pixel: new FakePixel(5, 6),
+      lnglat: [121.6, 31.3]
+    })
+    expect(clicks).toHaveLength(1)
+    expect(clicks[0].feature).toEqual(pointFeature)
+    expect(clicks[0].event.featureId).toBe('p1')
+    expect(clicks[0].event.category).toBe('bank')
+    expect(layer.getInfo().clickedFeatureId).toBe('p1')
+    expect(visualLayer.style.radius(0, pointFeature)).toBe(14)
+
+    visualLayer.queryResult = null
+    map.handlers.mousemove({
+      pixel: new FakePixel(7, 8)
+    })
+    expect(outs).toHaveLength(1)
+    expect(outs[0].event.featureId).toBe('p1')
+    expect(layer.getInfo().hoveredFeatureId).toBeNull()
+
+    layer.destroy()
+    expect(map.handlers.click).toBeUndefined()
+    expect(map.handlers.mousemove).toBeUndefined()
+  })
+
+  test('LocaController opens infoWindow before invoking Loca click callback', () => {
+    FakeInfoWindow.instances = []
+    const clickEvents = []
+    const actions = {
+      setLayerInfo: jest.fn(),
+      removeLayerInfo: jest.fn(),
+      clearLayerInfo: jest.fn()
+    }
+    const container = {
+      layers: [],
+      add(layer) {
+        this.layers.push(layer)
+      },
+      remove(layer) {
+        this.layers = this.layers.filter((item) => item !== layer)
+      },
+      requestRender() {}
+    }
+    class Container {
+      constructor(options) {
+        this.options = options
+      }
+
+      add(layer) {
+        container.add(layer)
+      }
+
+      remove(layer) {
+        container.remove(layer)
+      }
+
+      requestRender() {
+        container.requestRender()
+      }
+    }
+    const map = {
+      handlers: {},
+      on(type, handler) {
+        this.handlers[type] = handler
+      },
+      off(type, handler) {
+        if (!handler || this.handlers[type] === handler) {
+          delete this.handlers[type]
+        }
+      }
+    }
+    const controller = new LocaController({
+      Loca: {
+        Container,
+        GeoJSONSource: FakeLocaSource,
+        PointLayer: FakeRuntimeLocaLayer
+      },
+      AMap: {
+        InfoWindow: FakeInfoWindow
+      },
+      map,
+      actions
+    })
+
+    controller.renderLayer({
+      layerId: 'loca-info',
+      type: 'point',
+      visible: true,
+      geoJSON: {
+        type: 'FeatureCollection',
+        features: [pointFeature]
+      },
+      style: {
+        radius: 6,
+        color: '#1677ff'
+      },
+      infoWindow: {
+        title: 'name',
+        fields: [
+          { label: '类型', field: 'category' }
+        ]
+      },
+      events: {
+        click(feature, event) {
+          clickEvents.push({ feature, event })
+        }
+      }
+    })
+
+    FakeRuntimeLocaLayer.instances[0].queryResult = pointFeature
+    map.handlers.click({
+      pixel: new FakePixel(9, 10),
+      lnglat: [121.5, 31.2]
+    })
+
+    expect(FakeInfoWindow.instances).toHaveLength(1)
+    expect(FakeInfoWindow.instances[0].openCalls[0].lnglat).toEqual([121.5, 31.2])
+    expect(String(FakeInfoWindow.instances[0].content)).toContain('point')
+    expect(clickEvents).toHaveLength(1)
+    expect(clickEvents[0].event.featureId).toBe('p1')
+
+    controller.closeInfoWindow()
+    expect(FakeInfoWindow.instances[0].close).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -1194,6 +1194,10 @@ const feature = locaActions.getFeatureInfo('bank-mass', 'bank-001')
 | `params.visible` | `boolean` | 初始是否显示 |
 | `params.style` | `object` | 传给 `layer.setStyle()` 的样式 |
 | `params.layerOptions` | `object` | 传给 Loca layer 构造器的选项 |
+| `params.events` | `object` | Loca 要素事件入口，支持 `click`、`mouseover`、`mouseout`，也支持 `hover` 作为 `mouseover` 别名 |
+| `params.hoverStyle` | `object` | 鼠标移入时的临时 Loca 样式，使用 Loca 扁平 style 结构 |
+| `params.clickStyle` | `object` | 鼠标点击后的选中样式，点击下一个要素会替换上一个选中态 |
+| `params.infoWindow` | `object` | 点击 Loca 要素时打开的信息窗配置，支持 `title`、`fields`、`content`、`actions` 和 `onAction` |
 | `params.category` | `string` | 未包装 Geometry 的默认分类 |
 | `params.properties` | `object` | 未包装 Geometry 的默认属性 |
 | `geoJSON` | `FeatureCollection | Feature | Geometry | Array` | 业务数据 |
@@ -1213,9 +1217,43 @@ locaActions.renderGeoJSONLayer({
   style: {
     radius: 5,
     color: '#1677ff'
+  },
+  hoverStyle: {
+    color: '#f59e0b'
+  },
+  clickStyle: {
+    radius: 12,
+    color: '#dc2626'
+  },
+  infoWindow: {
+    title: 'name',
+    fields: [
+      { label: '分类', field: 'category' },
+      { label: '数值', field: 'value' }
+    ],
+    actions: [
+      { key: 'detail', label: '查看详情', type: 'primary' }
+    ],
+    onAction(action, context) {
+      console.log(action.key, context.layerId, context.featureId)
+      context.close()
+    }
+  },
+  events: {
+    click(feature, event) {
+      console.log('click', event.featureId, event.properties)
+    },
+    mouseover(feature, event) {
+      console.log('hover', event.featureId)
+    },
+    mouseout(feature, event) {
+      console.log('leave', event.featureId)
+    }
   }
 }, geoJSON)
 ```
+
+Loca 事件通过离线包的 `queryFeature(pixel)` 拾取原始 GeoJSON 要素。只有能解析回原始 Feature 的结果会触发回调；热力图等聚合结果如果没有原始 Feature，不会触发业务事件或信息窗。事件回调的第二个参数包含 `type`、`layerId`、`featureId`、`category`、`properties`、`lnglat`、`pixel`、`locaLayer`、`rawFeature` 和 `rawEvent`。
 
 ### setLayerVisible(layerId, visible)
 

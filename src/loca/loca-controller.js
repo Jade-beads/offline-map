@@ -1,4 +1,5 @@
 import { createLocaLayer } from './loca-layer-registry'
+import { InfoWindowManager } from '../map/info-window-manager'
 
 export class LocaController {
   constructor({ Loca, AMap, map, actions }) {
@@ -13,6 +14,7 @@ export class LocaController {
     this.actions = actions
     this.container = new Container({ map })
     this.layers = new Map()
+    this.infoWindowManager = new InfoWindowManager({ AMap, map })
   }
 
   handleCommand(command) {
@@ -30,7 +32,8 @@ export class LocaController {
       'loca:layer:feature-styles:clear': () => this.clearLayerFeatureStyles(command.payload),
       'loca:layer:fit-view': () => this.fitLayerView(command.payload),
       'loca:layer:clear': () => this.clearLayer(command.payload),
-      'loca:layers:clear': () => this.clearAllLayers()
+      'loca:layers:clear': () => this.clearAllLayers(),
+      'loca:infowindow:close': () => this.closeInfoWindow()
     }
 
     if (handlers[command.type]) {
@@ -46,7 +49,10 @@ export class LocaController {
     layer.setData(payload.geoJSON, payload.style, {
       defaultProperties: payload.defaultProperties,
       layerOptions: payload.layerOptions,
-      type: payload.type
+      type: payload.type,
+      events: this.createLayerEvents(payload),
+      hoverStyle: payload.hoverStyle,
+      clickStyle: payload.clickStyle
     })
 
     if (payload.visible === false) {
@@ -60,6 +66,31 @@ export class LocaController {
     }
 
     this.syncLayerInfo(payload.layerId, layer)
+  }
+
+  createLayerEvents(payload = {}) {
+    const events = payload.events || {}
+    const infoWindow = payload.infoWindow
+    if (!infoWindow) return events
+
+    return {
+      ...events,
+      click: (feature, event = {}) => {
+        this.openInfoWindow(payload.layerId, infoWindow, feature, event)
+
+        if (typeof events.click === 'function') {
+          events.click(feature, event)
+        }
+      }
+    }
+  }
+
+  openInfoWindow(layerId, infoWindow, feature, event = {}) {
+    this.infoWindowManager.open(layerId, infoWindow, feature, event)
+  }
+
+  closeInfoWindow() {
+    this.infoWindowManager.close()
   }
 
   setLayerVisible(payload = {}) {
@@ -176,6 +207,7 @@ export class LocaController {
   }
 
   destroy() {
+    this.closeInfoWindow()
     this.clearAllLayers()
 
     if (this.container && typeof this.container.destroy === 'function') {
@@ -190,6 +222,7 @@ export class LocaController {
 
     this.container = null
     this.map = null
+    this.infoWindowManager.destroy()
   }
 
   getLayer(layerId, type) {

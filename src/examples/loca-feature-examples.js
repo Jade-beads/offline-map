@@ -65,6 +65,39 @@ export function renderLocaMassPointExample() {
       color: (index, feature) => CATEGORY_COLORS[feature.properties.category] || '#1677ff',
       borderWidth: 0,
       blurWidth: 0.65
+    },
+    hoverStyle: {
+      color: '#f59e0b',
+      blurWidth: 0.2
+    },
+    clickStyle: {
+      radius: 10,
+      color: '#dc2626',
+      blurWidth: 0.1
+    },
+    infoWindow: {
+      title: 'name',
+      fields: [
+        { label: '分类', field: 'category' },
+        { label: '数值', field: 'value' }
+      ],
+      actions: [
+        { key: 'detail', label: '查看详情', type: 'primary' }
+      ],
+      onAction(action, context) {
+        console.log('Loca 信息窗动作', action.key, context.featureId, context.properties)
+      }
+    },
+    events: {
+      click(feature, event) {
+        console.log('Loca 点击', event.featureId, feature.properties)
+      },
+      mouseover(feature, event) {
+        console.log('Loca 移入', event.featureId)
+      },
+      mouseout(feature, event) {
+        console.log('Loca 移出', event.featureId)
+      }
     }
   }, massPointGeoJSON)
 

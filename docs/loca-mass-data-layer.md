@@ -70,10 +70,16 @@ locaActions.renderGeoJSONLayer({
 - `visible`：首次渲染后是否显示。
 - `layerOptions`：传给 Loca 图层构造器的配置，例如 `zIndex`、`opacity`、`blend`、`zooms`。
 - `style`：传给 Loca `layer.setStyle()` 的样式配置。
+- `events`：Loca 要素事件配置，支持 `click`、`mouseover`、`mouseout`，`hover` 可作为 `mouseover` 别名。
+- `hoverStyle`：鼠标移入命中要素时的临时样式，使用 Loca 扁平 style 结构。
+- `clickStyle`：鼠标点击命中要素后的选中样式，再次点击其他要素会替换选中态。
+- `infoWindow`：点击命中要素时打开的信息窗配置，支持字段展示、可信 HTML 内容和动作按钮。
 - `category`：当传入的是未包装的 GeoJSON Geometry 时，可作为默认 `properties.category`。
 - `properties`：当传入的是未包装 Geometry 时，合并为默认 `properties`。
 
 `geoJSON` 可以是 `FeatureCollection`、单个 `Feature`、单个 Geometry，或这些对象的数组。推荐业务接口侧最终整理成标准 `FeatureCollection`。
+
+事件拾取依赖离线 Loca 图层的 `queryFeature(pixel)`。如果拾取结果无法映射回原始 GeoJSON Feature，例如部分聚合热力结果，只会保持图层渲染，不触发业务事件或信息窗。
 
 ## 图层类型
 
@@ -124,11 +130,44 @@ async function renderBankMassPoints() {
     },
     style: {
       radius: (index, feature) => feature.properties.category === 'branch' ? 6 : 4,
-      color: (index, feature) => feature.properties.category === 'atm' ? '#16a34a' : '#1677ff',
-      borderWidth: 0,
-      blurWidth: 0.65
+    color: (index, feature) => feature.properties.category === 'atm' ? '#16a34a' : '#1677ff',
+    borderWidth: 0,
+    blurWidth: 0.65
+  },
+  hoverStyle: {
+    color: '#f59e0b',
+    blurWidth: 0.2
+  },
+  clickStyle: {
+    radius: 10,
+    color: '#dc2626',
+    blurWidth: 0.1
+  },
+  infoWindow: {
+    title: 'name',
+    fields: [
+      { label: '分类', field: 'category' },
+      { label: '数值', field: 'value' }
+    ],
+    actions: [
+      { key: 'detail', label: '查看详情', type: 'primary' }
+    ],
+    onAction(action, context) {
+      console.log(action.key, context.featureId)
     }
-  }, geoJSON)
+  },
+  events: {
+    click(feature, event) {
+      console.log('click', event.featureId, event.properties)
+    },
+    mouseover(feature, event) {
+      console.log('hover', event.featureId)
+    },
+    mouseout(feature, event) {
+      console.log('leave', event.featureId)
+    }
+  }
+}, geoJSON)
 }
 ```
 

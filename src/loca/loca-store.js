@@ -23,6 +23,19 @@ function getRenderDefaultProperties(renderParams) {
   return Object.keys(properties).length ? properties : undefined
 }
 
+function validateInfoWindowConfig(renderParams) {
+  const infoWindow = renderParams.infoWindow
+  if (!isPlainObject(infoWindow)) return
+
+  const actions = Array.isArray(infoWindow.actions)
+    ? infoWindow.actions.filter(Boolean)
+    : []
+
+  if (actions.length && typeof infoWindow.onAction !== 'function') {
+    throw new Error('locaActions.renderGeoJSONLayer: infoWindow.actions 需要提供 infoWindow.onAction 回调')
+  }
+}
+
 export const locaStore = Vue.observable({
   commandSeq: 0,
   commandQueue: [],
@@ -90,6 +103,8 @@ export const locaActions = {
 
     if (!layerId) return
 
+    validateInfoWindowConfig(renderParams)
+
     this.dispatchLocaCommand('loca:layer:render', {
       layerId,
       geoJSON,
@@ -97,8 +112,16 @@ export const locaActions = {
       visible: renderParams.visible,
       style: renderParams.style || (geoJSON && (geoJSON.style || (geoJSON.properties && geoJSON.properties.style))),
       layerOptions: renderParams.layerOptions,
+      events: renderParams.events,
+      hoverStyle: renderParams.hoverStyle,
+      clickStyle: renderParams.clickStyle,
+      infoWindow: renderParams.infoWindow,
       defaultProperties: getRenderDefaultProperties(renderParams)
     })
+  },
+
+  closeInfoWindow() {
+    this.dispatchLocaCommand('loca:infowindow:close')
   },
 
   setLayerVisible(layerId, visible) {

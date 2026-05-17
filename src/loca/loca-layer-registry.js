@@ -180,6 +180,29 @@ function getGeometryKind(feature) {
   return ''
 }
 
+function normalizeEventLngLat(lnglat) {
+  if (!lnglat) return null
+  if (typeof lnglat.toArray === 'function') return lnglat.toArray()
+  if (typeof lnglat.getLng === 'function' && typeof lnglat.getLat === 'function') {
+    return [lnglat.getLng(), lnglat.getLat()]
+  }
+  return Array.isArray(lnglat) ? lnglat : null
+}
+
+function normalizeEventPixel(pixel) {
+  if (!pixel) return null
+  if (Array.isArray(pixel)) return pixel
+
+  const x = pixel.x != null
+    ? pixel.x
+    : (typeof pixel.getX === 'function' ? pixel.getX() : undefined)
+  const y = pixel.y != null
+    ? pixel.y
+    : (typeof pixel.getY === 'function' ? pixel.getY() : undefined)
+
+  return x == null || y == null ? null : [x, y]
+}
+
 function getNumericProperty(feature, field, fallback) {
   const value = getFeatureProperties(feature)[field]
   const numberValue = Number(value)
@@ -500,6 +523,11 @@ function hasFeatureStyle(style) {
   return isPlainObject(style) && Object.keys(style).length > 0
 }
 
+function getLocaEventCallback(events, type) {
+  if (!isPlainObject(events)) return null
+  return events[type] || (type === 'mouseover' ? events.hover : null)
+}
+
 function getStyleFeatureKey(feature) {
   const properties = getFeatureProperties(feature)
   const id = feature && feature.id != null ? feature.id : properties.id
@@ -533,6 +561,38 @@ function applyFeatureStyleOverrides(visualStyle, featureStyleOverrides) {
   return nextStyle
 }
 
+function applyInteractionStyleOverrides(visualStyle, state) {
+  if (!state.hoveredFeatureKey && !state.clickedFeatureKey) return visualStyle
+
+  const nextStyle = {
+    ...(visualStyle || {})
+  }
+
+  Object.keys(visualStyle || {}).forEach((key) => {
+    const baseValue = visualStyle && visualStyle[key]
+    nextStyle[key] = (index, feature) => {
+      const featureKey = getStyleFeatureKey(feature)
+      const styleChain = []
+
+      if (state.clickedFeatureKey && state.clickedFeatureKey === featureKey) {
+        styleChain.push(state.clickStyle)
+      }
+      if (state.hoveredFeatureKey && state.hoveredFeatureKey === featureKey) {
+        styleChain.push(state.hoverStyle)
+      }
+
+      const styleOverride = mergeStyle(...styleChain)
+      if (styleOverride && styleOverride[key] !== undefined) {
+        return resolveStyleValue(styleOverride[key], index, feature)
+      }
+
+      return resolveStyleValue(baseValue, index, feature)
+    }
+  })
+
+  return nextStyle
+}
+
 export function createLocaLayer(layerId, context) {
   const { Loca, AMap, map, container, type: initialType } = context
   let source = null
@@ -544,7 +604,13 @@ export function createLocaLayer(layerId, context) {
   let constructorName = ''
   let visualStyle = {}
   let layerOptions = {}
+  let layerEvents = {}
+  let hoverStyle = {}
+  let clickStyle = {}
+  let hoveredFeatureKey = ''
+  let clickedFeatureKey = ''
   let visible = false
+  const mapEventHandlers = {}
   const hiddenCategories = new Set()
   const hiddenFeatureIds = new Set()
   const featureStyleOverrides = new Map()
@@ -598,11 +664,17 @@ export function createLocaLayer(layerId, context) {
   }
 
   function getResolvedVisualStyle() {
-    return applyFeatureStyleOverrides(visualStyle, featureStyleOverrides)
+    const styleWithFeatureOverrides = applyFeatureStyleOverrides(visualStyle, featureStyleOverrides)
+    return applyInteractionStyleOverrides(styleWithFeatureOverrides, {
+      hoveredFeatureKey,
+      clickedFeatureKey,
+      hoverStyle,
+      clickStyle
+    })
   }
 
   function getResolvedHighlightStyle() {
-    const highlightStyle = applyFeatureStyleOverrides(visualStyle, featureStyleOverrides)
+    const highlightStyle = getResolvedVisualStyle()
 
     if (currentType === 'point' || currentType === 'points' || currentType === 'scatter') {
       return {
@@ -716,8 +788,146 @@ export function createLocaLayer(layerId, context) {
     requestRender(container)
   }
 
+  function getEventTypes() {
+    if (!isPlainObject(layerEvents)) return []
+
+    return Object.keys(layerEvents).filter((type) => typeof layerEvents[type] === 'function')
+  }
+
+  function hasMouseMoveBehavior() {
+    return typeof getLocaEventCallback(layerEvents, 'mouseover') === 'function' ||
+      typeof getLocaEventCallback(layerEvents, 'mouseout') === 'function' ||
+      hasFeatureStyle(hoverStyle)
+  }
+
+  function hasClickBehavior() {
+    return typeof getLocaEventCallback(layerEvents, 'click') === 'function' ||
+      hasFeatureStyle(clickStyle)
+  }
+
+  function applyCurrentVisualStyle() {
+    if (layer && typeof layer.setStyle === 'function') {
+      layer.setStyle(getResolvedVisualStyle())
+    }
+    refreshHighlightLayer()
+    requestRender(container)
+  }
+
+  function getPickedFeature(rawFeature) {
+    if (!rawFeature) return null
+    if (features.includes(rawFeature)) return rawFeature
+
+    const rawProperties = getFeatureProperties(rawFeature)
+    const rawId = rawFeature.id != null ? rawFeature.id : rawProperties.id
+    if (rawId == null) return null
+
+    const key = String(rawId)
+    return getVisibleFeatures().find((feature) => getFeatureStyleKey(feature) === key) || null
+  }
+
+  function createEventPayload(type, feature, rawFeature, rawEvent = {}) {
+    return {
+      type,
+      layerId,
+      feature,
+      featureId: getFeatureId(feature),
+      category: getFeatureCategory(feature),
+      properties: getFeatureProperties(feature),
+      lnglat: normalizeEventLngLat(rawEvent.lnglat),
+      pixel: normalizeEventPixel(rawEvent.pixel),
+      locaLayer: layer,
+      rawFeature,
+      rawEvent
+    }
+  }
+
+  function emitFeatureEvent(type, feature, rawFeature, rawEvent = {}) {
+    const callback = getLocaEventCallback(layerEvents, type)
+    if (typeof callback !== 'function') return
+
+    const payload = createEventPayload(type, feature, rawFeature, rawEvent)
+    try {
+      callback(feature, payload)
+    } catch (error) {
+      console.error(`[Loca] ${layerId} ${type} event callback failed.`, error)
+    }
+  }
+
+  function handleClick(event = {}) {
+    const rawFeature = layer && typeof layer.queryFeature === 'function' && normalizeEventPixel(event.pixel)
+      ? layer.queryFeature(normalizeEventPixel(event.pixel))
+      : null
+    const feature = getPickedFeature(rawFeature)
+    if (!feature) return
+
+    const featureKey = getFeatureStyleKey(feature)
+    if (hasFeatureStyle(clickStyle) && clickedFeatureKey !== featureKey) {
+      clickedFeatureKey = featureKey
+      applyCurrentVisualStyle()
+    }
+
+    emitFeatureEvent('click', feature, rawFeature, event)
+  }
+
+  function handleMouseMove(event = {}) {
+    const rawFeature = layer && typeof layer.queryFeature === 'function' && normalizeEventPixel(event.pixel)
+      ? layer.queryFeature(normalizeEventPixel(event.pixel))
+      : null
+    const feature = getPickedFeature(rawFeature)
+    const featureKey = feature ? getFeatureStyleKey(feature) : ''
+    const previousFeature = hoveredFeatureKey
+      ? getVisibleFeatures().find((item) => getFeatureStyleKey(item) === hoveredFeatureKey)
+      : null
+
+    if (featureKey === hoveredFeatureKey) return
+
+    if (previousFeature) {
+      emitFeatureEvent('mouseout', previousFeature, previousFeature, event)
+    }
+
+    hoveredFeatureKey = featureKey
+
+    if (feature) {
+      emitFeatureEvent('mouseover', feature, rawFeature, event)
+    }
+
+    if (hasFeatureStyle(hoverStyle)) {
+      applyCurrentVisualStyle()
+    }
+  }
+
+  function unbindMapEvents() {
+    if (!map || typeof map.off !== 'function') {
+      Object.keys(mapEventHandlers).forEach((type) => {
+        delete mapEventHandlers[type]
+      })
+      return
+    }
+
+    Object.keys(mapEventHandlers).forEach((type) => {
+      map.off(type, mapEventHandlers[type])
+      delete mapEventHandlers[type]
+    })
+  }
+
+  function bindMapEvents() {
+    unbindMapEvents()
+    if (!map || typeof map.on !== 'function') return
+
+    if (hasClickBehavior()) {
+      mapEventHandlers.click = handleClick
+      map.on('click', mapEventHandlers.click)
+    }
+
+    if (hasMouseMoveBehavior()) {
+      mapEventHandlers.mousemove = handleMouseMove
+      map.on('mousemove', mapEventHandlers.mousemove)
+    }
+  }
+
   return {
     setData(geoJSON, style = {}, options = {}) {
+      unbindMapEvents()
       features = getFeatures(geoJSON, options.defaultProperties)
       currentType = inferLayerType(features, options.type)
 
@@ -725,9 +935,15 @@ export function createLocaLayer(layerId, context) {
       layerOptions = styleParts.layerOptions
       constructorName = ''
       visualStyle = mergeVisualStyle(currentType, constructorName, styleParts.visualStyle)
+      layerEvents = options.events || {}
+      hoverStyle = options.hoverStyle || {}
+      clickStyle = options.clickStyle || {}
+      hoveredFeatureKey = ''
+      clickedFeatureKey = ''
       featureStyleOverrides.clear()
 
       renderLocaLayer()
+      bindMapEvents()
     },
 
     setStyle(style = {}) {
@@ -869,10 +1085,16 @@ export function createLocaLayer(layerId, context) {
     },
 
     destroy() {
+      unbindMapEvents()
       clearLocaLayer()
       features = []
       visualStyle = {}
       layerOptions = {}
+      layerEvents = {}
+      hoverStyle = {}
+      clickStyle = {}
+      hoveredFeatureKey = ''
+      clickedFeatureKey = ''
       hiddenCategories.clear()
       hiddenFeatureIds.clear()
       featureStyleOverrides.clear()
@@ -893,6 +1115,9 @@ export function createLocaLayer(layerId, context) {
         hiddenCategories: Array.from(hiddenCategories),
         hiddenFeatureIds: Array.from(hiddenFeatureIds),
         styledFeatureIds: Array.from(featureStyleOverrides.keys()),
+        eventTypes: getEventTypes(),
+        hoveredFeatureId: hoveredFeatureKey || null,
+        clickedFeatureId: clickedFeatureKey || null,
         geometryKinds: getLayerGeometryKinds(features),
         style: mergeStyle({}, visualStyle),
         styleSnapshot: mergeStyle({}, visualStyle),

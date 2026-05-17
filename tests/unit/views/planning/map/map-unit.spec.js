@@ -17,6 +17,7 @@ import {
 import { createVectorTileLayer } from '../../../../../src/map/vector-tile-layer-registry'
 import { buildWMTSTileUrl, createWMTSLayer } from '../../../../../src/map/wmts-layer-registry'
 import { createWMSLayer } from '../../../../../src/map/wms-layer-registry'
+import { locaActions, locaStore } from '../../../../../src/loca/loca-store'
 
 const pointFeature = {
   type: 'Feature',
@@ -704,6 +705,75 @@ describe('map-store actions', () => {
     expect(mapStore.activeTool).toBe('custom-marker')
     expect(mapStore.customMarkerResult).toBe(null)
     expect(mapStore.commandQueue[2].type).toBe('marker:start')
+  })
+})
+
+describe('loca-store actions', () => {
+  beforeEach(() => {
+    locaActions.clearHandledCommands(Number.POSITIVE_INFINITY)
+    locaActions.clearLayerInfo()
+  })
+
+  test('dispatches Loca render command with events, interaction styles and infoWindow', () => {
+    const events = {
+      click: jest.fn()
+    }
+    const hoverStyle = {
+      color: '#f59e0b'
+    }
+    const clickStyle = {
+      radius: 14
+    }
+    const infoWindow = {
+      title: 'name',
+      actions: [
+        { key: 'detail', label: '查看详情' }
+      ],
+      onAction: jest.fn()
+    }
+
+    locaActions.renderGeoJSONLayer({
+      layerId: 'loca-devices',
+      type: 'point',
+      events,
+      hoverStyle,
+      clickStyle,
+      infoWindow
+    }, {
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    })
+
+    expect(locaStore.commandQueue).toHaveLength(1)
+    expect(locaStore.commandQueue[0].type).toBe('loca:layer:render')
+    expect(locaStore.commandQueue[0].payload.events).toBe(events)
+    expect(locaStore.commandQueue[0].payload.hoverStyle).toBe(hoverStyle)
+    expect(locaStore.commandQueue[0].payload.clickStyle).toBe(clickStyle)
+    expect(locaStore.commandQueue[0].payload.infoWindow).toBe(infoWindow)
+  })
+
+  test('requires onAction when Loca InfoWindow actions are configured', () => {
+    expect(() => locaActions.renderGeoJSONLayer({
+      layerId: 'loca-devices',
+      infoWindow: {
+        actions: [
+          { key: 'detail', label: '查看详情' }
+        ]
+      }
+    }, {
+      type: 'FeatureCollection',
+      features: [pointFeature]
+    })).toThrow('infoWindow.actions 需要提供 infoWindow.onAction 回调')
+
+    expect(locaStore.commandQueue).toHaveLength(0)
+  })
+
+  test('dispatches Loca close InfoWindow command', () => {
+    locaActions.closeInfoWindow()
+
+    expect(locaStore.commandQueue).toHaveLength(1)
+    expect(locaStore.commandQueue[0].type).toBe('loca:infowindow:close')
+    expect(locaStore.commandQueue[0].payload).toBeNull()
   })
 })
 
